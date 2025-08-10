@@ -1,0 +1,1138 @@
+
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Performance Query Results</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+
+    :root {
+      --primary: #6366f1;
+      --primary-light: #a5b4fc;
+      --primary-dark: #4f46e5;
+      --secondary: #f1f5f9;
+      --accent: #10b981;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --gray-900: #111827;
+      --space-1: 0.25rem;
+      --space-2: 0.5rem;
+      --space-3: 0.75rem;
+      --space-4: 1rem;
+      --space-5: 1.25rem;
+      --space-6: 1.5rem;
+      --space-8: 2rem;
+      --space-10: 2.5rem;
+      --space-12: 3rem;
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      --border-radius: 0.375rem;
+    }
+
+    body {
+      font-family: "Inter", serif;
+      margin: 0;
+      background-color: #f5f5f5;
+    }
+
+    .sidebar {
+      height: 100vh;
+      width: 200px;
+      position: fixed;
+      z-index: 1;
+      top: 0;
+      left: 0;
+      background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
+      overflow-x: hidden;
+      padding-top: var(--space-5);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .sidebar a {
+      padding: var(--space-4) var(--space-6);
+      text-decoration: none;
+      font-size: 14px;
+      color: #ecf0f1;
+      display: block;
+      transition: all 0.3s ease;
+    }
+
+    .sidebar a:hover {
+      background-color: rgba(52, 152, 219, 0.2);
+      color: #3498db;
+      padding-left: var(--space-8);
+    }
+
+    .content {
+      margin-left: 200px;
+      padding: var(--space-5);
+    }
+
+    .menu-icon {
+      display: none;
+      font-size: 20px;
+      padding: var(--space-3);
+      background: var(--primary);
+      color: white;
+      cursor: pointer;
+      position: fixed;
+      width: 100%;
+      z-index: 1000;
+      box-shadow: var(--shadow-md);
+      top: 0;
+      left: 0;
+      user-select: none;
+    }
+
+    @media (max-width: 480px) {
+      .sidebar {
+        display: none;
+        position: fixed;
+        top: 50px;
+        left: 0;
+        width: 100%;
+        height: calc(100vh - 50px);
+        z-index: 999;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+      }
+
+      .sidebar.show {
+        display: block;
+        transform: translateX(0);
+      }
+
+      .sidebar a {
+        float: none;
+        text-align: left;
+        border-bottom: 1px solid var(--gray-200);
+        padding: var(--space-4);
+        display: block;
+      }
+
+      .menu-icon {
+        display: block;
+      }
+
+      .content {
+        margin-top: 50px;
+        margin-left: 0;
+        padding: var(--space-3);
+      }
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+
+    .tbl-container {
+      background: #fff;
+      height: 500px;
+      overflow-y: scroll;
+      position: relative;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .virtual-scroll-content {
+      position: relative;
+      margin-top: 0px;
+    }
+
+    .header-row {
+      position: sticky;
+      top: 0;
+      background: #f1f1f1;
+      z-index: 1;
+      display: flex;
+      border-left: 1px solid #ccc;
+    }
+
+    .div-row {
+      height: 35px;
+      display: flex;
+      border-left: 1px solid #ccc;
+      background-color: #fff;
+    }
+
+    .div-row:hover {
+      background-color: #f8f9fa;
+    }
+
+    .div-row > div, .header-row > div {
+      background-color: inherit;
+      color: #433E3F;
+      margin-top: 1px;
+      margin-bottom: 1px;
+      text-align: right;
+      font-family: "Inter", serif;
+      font-size: 14px;
+      padding: 6px;
+      border-right: 1px solid #ccc;
+      border-bottom: 1px solid #ccc;
+      flex: 1;
+      min-width: 120px;
+      box-sizing: border-box;
+    }
+
+    .div-row > div:first-child, .header-row > div:first-child {
+      text-align: left;
+    }
+
+    .header-row > div {
+      background-color: #f1f1f1;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .header-row > div:hover {
+      background-color: #e9ecef;
+    }
+
+    .loading {
+      padding: 20px;
+      text-align: center;
+      color: #666;
+    }
+
+    .error {
+      padding: 20px;
+      text-align: center;
+      color: #d32f2f;
+      background-color: #ffebee;
+      border-radius: 4px;
+      margin: 20px 0;
+    }
+
+    /* Responsive Controls Styling */
+    .controls-container {
+      background: white;
+      border-radius: var(--border-radius);
+      padding: var(--space-4);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--gray-200);
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: var(--space-4);
+      align-items: end;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .control-label {
+      font-weight: 600;
+      color: var(--gray-700);
+      font-size: 14px;
+      margin-bottom: var(--space-1);
+    }
+
+    .control-input {
+      padding: var(--space-2) var(--space-3);
+      font-size: 14px;
+      border: 1px solid var(--gray-300);
+      border-radius: var(--border-radius);
+      transition: all 0.2s ease;
+      background: white;
+      color: var(--gray-700);
+    }
+
+    .control-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    .date-input-group {
+      display: flex;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+    }
+
+    .date-input {
+      flex: 1;
+      min-width: 140px;
+    }
+
+    .inception-btn {
+      padding: var(--space-2) var(--space-3);
+      background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+      color: #ecf0f1;
+      border: none;
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      box-shadow: 0 2px 4px rgba(44, 62, 80, 0.2);
+    }
+
+    .inception-btn:hover {
+      background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(44, 62, 80, 0.3);
+    }
+
+    .load-data-btn {
+      padding: var(--space-3) var(--space-4);
+      background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+      color: #ecf0f1;
+      border: none;
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      width: 100%;
+      box-shadow: 0 2px 4px rgba(52, 152, 219, 0.2);
+    }
+
+    .load-data-btn:hover {
+      background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+    }
+
+    .load-btn-group {
+      align-self: end;
+    }
+
+    /* Mobile responsiveness */
+    @media (max-width: 768px) {
+      body {
+        font-size: 16px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+
+      .controls-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-3);
+      }
+
+      .control-label {
+        font-size: 16px;
+      }
+
+      .control-input, .inception-btn, .load-data-btn {
+        font-size: 16px;
+        padding: var(--space-3);
+      }
+
+      .date-input-group {
+        flex-direction: column;
+      }
+
+      .date-input {
+        min-width: unset;
+      }
+
+      .inception-btn {
+        width: 100%;
+        text-align: center;
+      }
+
+      .load-btn-group {
+        align-self: stretch;
+      }
+
+      .div-row > div, .header-row > div {
+        font-size: 16px;
+        padding: 8px;
+      }
+
+      .sidebar a {
+        font-size: 18px;
+        padding: var(--space-4) var(--space-6);
+      }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        font-size: 18px;
+      }
+
+      h1 {
+        font-size: 28px;
+        margin-bottom: 24px;
+      }
+
+      .controls-container {
+        padding: var(--space-3);
+        margin-left: -var(--space-3);
+        margin-right: -var(--space-3);
+        border-radius: 0;
+      }
+
+      .controls-grid {
+        gap: var(--space-2);
+      }
+
+      .control-label {
+        font-size: 18px;
+        margin-bottom: var(--space-2);
+      }
+
+      .control-input, .inception-btn, .load-data-btn {
+        padding: var(--space-4);
+        font-size: 18px; /* Larger for better readability */
+      }
+
+      .div-row > div, .header-row > div {
+        font-size: 16px;
+        padding: 10px 6px;
+        min-width: 100px;
+      }
+
+      .sidebar a {
+        font-size: 20px;
+        padding: var(--space-5) var(--space-6);
+      }
+
+      .loading, .error {
+        font-size: 18px;
+        padding: 24px;
+      }
+
+      /* Make modal content more readable on mobile */
+      .modal-content h2 {
+        font-size: 22px;
+      }
+
+      .modal-content table th,
+      .modal-content table td {
+        font-size: 16px;
+        padding: 12px 8px;
+      }
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+</head>
+<body>
+  <div class="menu-icon" onclick="toggleMenu()">☰ Menu</div>
+
+  <div class="sidebar">
+    <a href="index.php">Home</a>
+    <a href="calcperf.php">Calculate Performance</a>
+    <a href="performance.html">Performance Reports</a>
+    <a href="performance_results.html">Performance Results</a>
+    <a href="holdings.html">Holdings</a>
+    <a href="pivot.html">Analysis</a>
+    <a href="edgardata.html">Edgar Data</a>
+    <a href="risk.html">Risk Metrics</a>
+  </div>
+
+  <div class="content">
+    <h1>Performance Query Results</h1>
+
+    <div class="controls-container" style="margin-bottom: 20px;">
+    <div class="controls-grid">
+      <div class="control-group">
+        <label for="accountSelect" class="control-label">Select Account:</label>
+        <select id="accountSelect" class="control-input">
+          <option value="">Loading accounts...</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="startDate" class="control-label">Start Date:</label>
+        <div class="date-input-group">
+          <input type="date" id="startDate" class="control-input date-input" value="2023-01-01">
+          <button id="inceptionBtn" type="button" class="inception-btn">Use Inception Date</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label for="endDate" class="control-label">End Date:</label>
+        <input type="date" id="endDate" class="control-input">
+      </div>
+
+      <div class="control-group load-btn-group">
+        <button id="loadDataBtn" class="load-data-btn">Load Performance Data</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="loading" class="loading" style="display: none;">Loading data...</div>
+  <div id="error" class="error" style="display: none;"></div>
+
+  <div id="chart-container" style="display: none; margin-bottom: 20px; background: white; border-radius: var(--border-radius); padding: var(--space-4); box-shadow: var(--shadow-sm); border: 1px solid var(--gray-200);">
+    <div id="performance-chart" style="width: 100%; height: 400px;"></div>
+  </div>
+
+  <div class="tbl-container" style="display: none;">
+    <div class="header-row" id="dynamicHeader"></div>
+    <div class="virtual-scroll-content"></div>
+  </div>
+
+  <!-- Holdings Modal -->
+  <div id="holdingsModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4);">
+    <div class="modal-content" style="background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 800px; border-radius: 8px; max-height: 80vh; overflow-y: auto;">
+      <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 10px;">
+        <h2 id="modalTitle" style="margin: 0; color: #333;">Holdings as of Date</h2>
+        <span class="close" style="color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; line-height: 1;">&times;</span>
+      </div>
+      <div id="holdingsContent">
+        <div id="holdingsLoading" style="text-align: center; padding: 20px; color: #666;">Loading holdings...</div>
+        <div id="holdingsError" style="display: none; text-align: center; padding: 20px; color: #d32f2f; background-color: #ffebee; border-radius: 4px;">Error loading holdings</div>
+        <div id="holdingsTable" style="display: none;">
+          <table style="width: 100%; border-collapse: collapse; font-family: 'Inter', sans-serif;">
+            <thead>
+              <tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6; font-weight: 600;">Ticker</th>
+                <th style="padding: 12px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Shares</th>
+                <th style="padding: 12px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Price</th>
+                <th style="padding: 12px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Market Value</th>
+              </tr>
+            </thead>
+            <tbody id="holdingsTableBody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    class VirtualScroll {
+      constructor(container, data) {
+        this.container = container;
+        container.__virtualScroll = this;
+        this.itemHeight = 35;
+        this.content = container.querySelector('.virtual-scroll-content');
+        this.originalData = data;
+        this.data = [...data];
+        this.totalItems = data.length;
+        this.visibleItems = Math.ceil(container.clientHeight / this.itemHeight);
+        this.cachedRows = new Map();
+        this.sortColumn = null;
+        this.sortAscending = true;
+
+        this.setupScroll();
+        this.setupSorting();
+        this.render();
+
+        this.container.addEventListener('scroll', () => {
+          window.requestAnimationFrame(() => this.render());
+        });
+      }
+
+      setupSorting() {
+        const headers = this.container.querySelectorAll('.header-row > div');
+        headers.forEach((header, index) => {
+          header.style.cursor = 'pointer';
+          header.addEventListener('click', () => this.sort(index));
+        });
+      }
+
+      sort(columnIndex) {
+        const headers = Array.from(this.container.querySelectorAll('.header-row > div'));
+        const columnKey = headers[columnIndex].textContent;
+
+        if (this.sortColumn === columnKey) {
+          this.sortAscending = !this.sortAscending;
+        } else {
+          this.sortColumn = columnKey;
+          this.sortAscending = true;
+        }
+
+        this.data.sort((a, b) => {
+          const valueA = a[columnKey];
+          const valueB = b[columnKey];
+
+          if (!isNaN(valueA) && !isNaN(valueB)) {
+            return this.sortAscending ? valueA - valueB : valueB - valueA;
+          }
+
+          const comparison = String(valueA).localeCompare(String(valueB));
+          return this.sortAscending ? comparison : -comparison;
+        });
+
+        this.cachedRows.clear();
+        this.render();
+      }
+
+      createRow(rowData, index) {
+        if (this.cachedRows.has(index)) {
+          return this.cachedRows.get(index);
+        }
+
+        const row = document.createElement('div');
+        row.className = 'div-row';
+
+        let cellIndex = 0;
+        for (let x in rowData) {
+          const cell = document.createElement('div');
+          let cellValue = rowData[x];
+
+          // Make date cells clickable
+          if (x === 'date') {
+            cell.style.cursor = 'pointer';
+            cell.style.color = '#007bff';
+            cell.style.textDecoration = 'underline';
+            cell.addEventListener('click', () => {
+              showHoldingsModal(cellValue, document.getElementById('accountSelect').value);
+            });
+          }
+
+          // Format numeric values
+          if (!isNaN(cellValue) && cellValue !== null && cellValue !== '') {
+            const num = parseFloat(cellValue);
+            if (x === 'total_market_value' || x === 'contr_distr') {
+              cellValue = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+              }).format(num);
+            } else if (x === 'factor' || x === 'pct_return' || 'spy_pct_return') {
+              cellValue = (num * 100).toFixed(4) + '%';
+            } else if (Number.isInteger(num)) {
+              cellValue = num.toLocaleString();
+            } else {
+              cellValue = num.toFixed(4);
+            }
+          }
+
+          cell.textContent = cellValue;
+          row.appendChild(cell);
+          cellIndex++;
+        }
+
+        this.cachedRows.set(index, row);
+        return row;
+      }
+
+      setupScroll() {
+        this.content.style.height = `${this.totalItems * this.itemHeight}px`;
+      }
+
+      render() {
+        const scrollTop = this.container.scrollTop;
+        const startIndex = Math.floor(scrollTop / this.itemHeight);
+        const endIndex = Math.min(startIndex + this.visibleItems + 2, this.totalItems);
+
+        this.content.innerHTML = '';
+
+        for(let i = startIndex; i < endIndex; i++) {
+          if (i >= 0 && i < this.data.length) {
+            const row = this.createRow(this.data[i], i);
+            row.style.position = 'absolute';
+            row.style.top = `${i * this.itemHeight}px`;
+            row.style.width = '100%';
+            this.content.appendChild(row);
+          }
+        }
+      }
+    }
+
+    function createHeaderColumns(data) {
+      if (!data || data.length === 0) return;
+
+      const headerRow = document.getElementById('dynamicHeader');
+      const firstRow = data[0];
+
+      Object.keys(firstRow).forEach(key => {
+        const headerDiv = document.createElement('div');
+        headerDiv.textContent = key;
+        headerRow.appendChild(headerDiv);
+      });
+    }
+
+    function showError(message) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error').textContent = message;
+      document.getElementById('error').style.display = 'block';
+    }
+
+    function createChart(data) {
+      const dates = data.map(row => row.date);
+
+      // Calculate growth of $10,000 based on percentage returns
+      let portfolioValues = [];
+      let spyValues = [];
+      let portfolioValue = 10000;
+      let spyValue = 10000;
+      let portfolioReturns = [];
+      let spyReturns = [];
+
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i];
+        const portfolioReturn = parseFloat(row.pct_return) || 0;
+        const spyReturn = parseFloat(row.spy_pct_return) || 0;
+
+        portfolioReturns.push(portfolioReturn);
+        spyReturns.push(spyReturn);
+
+        // Calculate new values based on previous value and return
+        portfolioValue = portfolioValue * (1 + portfolioReturn);
+        spyValue = spyValue * (1 + spyReturn);
+
+        portfolioValues.push(portfolioValue);
+        spyValues.push(spyValue);
+      }
+
+      // Calculate metrics
+      const metrics = calculateMetrics(portfolioValues, spyValues, portfolioReturns, spyReturns);
+      displayMetrics(metrics);
+
+      const options = {
+        series: [{
+          name: 'Portfolio ($10,000 Growth)',
+          data: portfolioValues
+        }, {
+          name: 'SPY ($10,000 Growth)',
+          data: spyValues
+        }],
+        chart: {
+          type: 'line',
+          height: 400,
+          zoom: {
+            enabled: true
+          }
+        },
+        dataLabels: {
+          enabled: false
+        },
+        stroke: {
+          curve: 'smooth',
+          width: 2
+        },
+        title: {
+          text: 'Growth of $10,000 - Portfolio vs SPY',
+          align: 'center'
+        },
+        xaxis: {
+          categories: dates,
+          type: 'datetime',
+          labels: {
+            rotate: -45,
+            style: {
+              fontSize: '12px'
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            formatter: function(val) {
+              return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+              }).format(val);
+            }
+          }
+        },
+        colors: ['#008FFB', '#00E396'],
+        legend: {
+          position: 'top',
+          horizontalAlign: 'right',
+          floating: true,
+          offsetY: -25,
+          offsetX: -5
+        },
+        tooltip: {
+          x: {
+            format: 'MMM dd, yyyy'
+          },
+          y: {
+            formatter: function(value) {
+              return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+              }).format(value);
+            }
+          }
+        }
+      };
+
+      const chart = new ApexCharts(document.querySelector("#performance-chart"), options);
+      chart.render();
+    }
+
+    function calculateMetrics(portfolioValues, spyValues, portfolioReturns, spyReturns) {
+      // Calculate CAGR
+      const portfolioFirstVal = portfolioValues[0];
+      const portfolioLastVal = portfolioValues[portfolioValues.length - 1];
+      const spyFirstVal = spyValues[0];
+      const spyLastVal = spyValues[spyValues.length - 1];
+      const years = portfolioValues.length / 252; // Assuming daily data, 252 trading days per year
+
+      const portfolioCagr = (Math.pow(portfolioLastVal / portfolioFirstVal, 1 / years) - 1) * 100;
+      const spyCagr = (Math.pow(spyLastVal / spyFirstVal, 1 / years) - 1) * 100;
+
+      // Calculate standard deviation (annualized)
+      const portfolioStdDev = calculateStandardDeviation(portfolioReturns) * Math.sqrt(252) * 100;
+      const spyStdDev = calculateStandardDeviation(spyReturns) * Math.sqrt(252) * 100;
+
+      // Calculate Sharpe ratio (assuming 0% risk-free rate)
+      const portfolioSharpe = portfolioCagr / portfolioStdDev;
+      const spySharpe = spyCagr / spyStdDev;
+
+      return {
+        portfolio: {
+          cagr: portfolioCagr,
+          stdDev: portfolioStdDev,
+          sharpe: portfolioSharpe,
+          finalValue: portfolioLastVal
+        },
+        spy: {
+          cagr: spyCagr,
+          stdDev: spyStdDev,
+          sharpe: spySharpe,
+          finalValue: spyLastVal
+        }
+      };
+    }
+
+    function calculateStandardDeviation(returns) {
+      const mean = returns.reduce((sum, ret) => sum + ret, 0) / returns.length;
+      const variance = returns.reduce((sum, ret) => sum + Math.pow(ret - mean, 2), 0) / returns.length;
+      return Math.sqrt(variance);
+    }
+
+    function displayMetrics(metrics) {
+      const metricsHtml = `
+        <div style="background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <h3 style="margin-top: 0; margin-bottom: 20px; color: #333;">Performance Metrics</h3>
+          <table style="width: 100%; border-collapse: collapse; font-family: 'Inter', sans-serif;">
+            <thead>
+              <tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6; font-weight: 600;">Metric</th>
+                <th style="padding: 12px; text-align: center; border: 1px solid #dee2e6; font-weight: 600; color: #008FFB;">Portfolio</th>
+                <th style="padding: 12px; text-align: center; border: 1px solid #dee2e6; font-weight: 600; color: #00E396;">SPY Benchmark</th>
+                <th style="padding: 12px; text-align: center; border: 1px solid #dee2e6; font-weight: 600; color: #856404;">Difference</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="background-color: #fff;">
+                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: 500;">CAGR</td>
+                <td style="padding: 10px; border: 1px solid #dee2e6; text-align: center;">${metrics.portfolio.cagr.toFixed(2)}%</td>
+                <td style="padding: 10px; border: 1px solid #dee2e6; text-align: center;">${metrics.spy.cagr.toFixed(2)}%</td>
+                <td style="padding: 10px; border: 1px solid #dee2e6; text-align: center; color: ${(metrics.portfolio.cagr - metrics.spy.cagr) > 0 ? '#28a745' : '#dc3545'};">${(metrics.portfolio.cagr - metrics.spy.cagr) > 0 ? '+' : ''}${(metrics.portfolio.cagr - metrics.spy.cagr).toFixed(2)}%</td>
+              </tr>
+              <tr style="background-color: #f8f9fa;">
+                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: 500;">Volatility</td>
+                <td style="padding: 10px; border: 1px solid #dee2e6; text-align: center;">${metrics.portfolio.stdDev.toFixed(2)}%</td>
+                <td style="padding: 10px; border: 1px solid #dee2e6; text-align: center;">${metrics.spy.stdDev.toFixed(2)}%</td>
+                <td style="padding: 10px; border: 1px solid #dee2e6; text-align: center;">${(metrics.portfolio.stdDev - metrics.spy.stdDev) > 0 ? '+' : ''}${(metrics.portfolio.stdDev - metrics.spy.stdDev).toFixed(2)}%</td>
+              </tr>
+              <tr style="background-color: #fff;">
+                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: 500;">Sharpe Ratio</td>
+                <td style="padding: 10px; border: 1px solid #dee2e6; text-align: center;">${metrics.portfolio.sharpe.toFixed(2)}</td>
+                <td style="padding: 10px; border: 1px solid #dee2e6; text-align: center;">${metrics.spy.sharpe.toFixed(2)}</td>
+                <td style="padding: 10px; border: 1px solid #dee2e6; text-align: center; color: ${(metrics.portfolio.sharpe - metrics.spy.sharpe) > 0 ? '#28a745' : '#dc3545'};">${(metrics.portfolio.sharpe - metrics.spy.sharpe) > 0 ? '+' : ''}${(metrics.portfolio.sharpe - metrics.spy.sharpe).toFixed(2)}</td>
+              </tr>
+              <tr style="background-color: #f8f9fa;">
+                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: 500;">Final Value</td>
+                <td style="padding: 10px; border: 1px solid #dee2e6; text-align: center;">${new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD'}).format(metrics.portfolio.finalValue)}</td>
+                <td style="padding: 10px; border: 1px solid #dee2e6; text-align: center;">${new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD'}).format(metrics.spy.finalValue)}</td>
+                <td style="padding: 10px; border: 1px solid #dee2e6; text-align: center; color: ${(metrics.portfolio.finalValue - metrics.spy.finalValue) > 0 ? '#28a745' : '#dc3545'};">${new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD'}).format(metrics.portfolio.finalValue - metrics.spy.finalValue)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      let metricsDiv = document.getElementById('metrics-container');
+      if (!metricsDiv) {
+        metricsDiv = document.createElement('div');
+        metricsDiv.id = 'metrics-container';
+        // Insert metrics after chart but before data table
+        const dataTable = document.querySelector('.tbl-container');
+        dataTable.parentNode.insertBefore(metricsDiv, dataTable);
+      }
+      metricsDiv.innerHTML = metricsHtml;
+    }
+
+    // Load accounts on page load
+    loadAccounts();
+
+    // Add event listener for load data button
+    document.getElementById('loadDataBtn').addEventListener('click', loadPerformanceData);
+
+    // Add event listener for inception date button
+    document.getElementById('inceptionBtn').addEventListener('click', loadInceptionDate);
+
+    function loadAccounts() {
+      fetch('scripts/loadaccounts.php')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(accounts => {
+          const select = document.getElementById('accountSelect');
+          select.innerHTML = '<option value="">Select an account...</option>';
+
+          accounts.forEach(account => {
+            const option = document.createElement('option');
+            option.value = account.acct_num;
+            option.textContent = account.acct_num;
+            select.appendChild(option);
+          });
+        })
+        .catch(error => {
+          console.error('Error loading accounts:', error);
+          document.getElementById('accountSelect').innerHTML = '<option value="">Error loading accounts</option>';
+        });
+    }
+
+    function loadInceptionDate() {
+      const selectedAccount = document.getElementById('accountSelect').value;
+
+      if (!selectedAccount) {
+        alert('Please select an account first');
+        return;
+      }
+
+      const inceptionBtn = document.getElementById('inceptionBtn');
+      const originalText = inceptionBtn.textContent;
+      inceptionBtn.textContent = 'Loading...';
+      inceptionBtn.disabled = true;
+
+      fetch(`get_inception_date.php?acct_num=${selectedAccount}`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (data.inception_date) {
+            document.getElementById('startDate').value = data.inception_date;
+          } else {
+            throw new Error('No inception date found');
+          }
+        })
+        .catch(error => {
+          console.error('Error loading inception date:', error);
+          alert('Error loading inception date: ' + error.message);
+        })
+        .finally(() => {
+          inceptionBtn.textContent = originalText;
+          inceptionBtn.disabled = false;
+        });
+    }
+
+    function loadPerformanceData() {
+      const selectedAccount = document.getElementById('accountSelect').value;
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+
+      if (!selectedAccount) {
+        showError('Please select an account first');
+        return;
+      }
+
+      // Clear previous data
+      document.querySelector('.tbl-container').style.display = 'none';
+      document.getElementById('chart-container').style.display = 'none';
+      document.getElementById('error').style.display = 'none';
+      document.getElementById('loading').style.display = 'block';
+
+      // Build URL with date parameters
+      let url = `performance_query.php?acct_num=${selectedAccount}`;
+      if (startDate) {
+        url += `&start_date=${startDate}`;
+      }
+      if (endDate) {
+        url += `&end_date=${endDate}`;
+      }
+
+      // Fetch data from performance_query.php with selected account and dates
+      fetch(url)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          document.getElementById('loading').style.display = 'none';
+
+          if (data && data.length > 0) {
+            // Create and show chart
+            createChart(data);
+            document.getElementById('chart-container').style.display = 'block';
+
+            // Clear previous header and show table
+            document.getElementById('dynamicHeader').innerHTML = '';
+            createHeaderColumns(data);
+            const container = document.querySelector('.tbl-container');
+            container.style.display = 'block';
+
+            // Clear any existing virtual scroll instance
+            if (container.__virtualScroll) {
+              container.__virtualScroll = null;
+            }
+
+            new VirtualScroll(container, data);
+          } else {
+            showError('No data found for selected account');
+          }
+        })
+        .catch(error => {
+          document.getElementById('loading').style.display = 'none';
+          console.error('Error fetching data:', error);
+          showError('Error loading data: ' + error.message);
+        });
+    }
+
+    function showHoldingsModal(date, accountNum) {
+      const modal = document.getElementById('holdingsModal');
+      const modalTitle = document.getElementById('modalTitle');
+      const holdingsLoading = document.getElementById('holdingsLoading');
+      const holdingsError = document.getElementById('holdingsError');
+      const holdingsTable = document.getElementById('holdingsTable');
+
+      // Show modal and reset state
+      modal.style.display = 'block';
+      modalTitle.textContent = `Holdings as of ${date}`;
+      holdingsLoading.style.display = 'block';
+      holdingsError.style.display = 'none';
+      holdingsTable.style.display = 'none';
+
+      // Fetch holdings data
+      fetch(`holdings_by_date.php?acct_num=${accountNum}&date=${date}`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          holdingsLoading.style.display = 'none';
+
+          if (data && data.length > 0) {
+            displayHoldings(data);
+            holdingsTable.style.display = 'block';
+          } else {
+            holdingsError.textContent = 'No holdings found for this date';
+            holdingsError.style.display = 'block';
+          }
+        })
+        .catch(error => {
+          holdingsLoading.style.display = 'none';
+          holdingsError.textContent = 'Error loading holdings: ' + error.message;
+          holdingsError.style.display = 'block';
+          console.error('Error fetching holdings:', error);
+        });
+    }
+
+    function displayHoldings(holdings) {
+      const tbody = document.getElementById('holdingsTableBody');
+      tbody.innerHTML = '';
+
+      holdings.forEach(holding => {
+        const row = document.createElement('tr');
+        row.style.borderBottom = '1px solid #dee2e6';
+
+        const tickerCell = document.createElement('td');
+        tickerCell.style.padding = '10px';
+        tickerCell.style.border = '1px solid #dee2e6';
+        tickerCell.textContent = holding.ticker;
+
+        const sharesCell = document.createElement('td');
+        sharesCell.style.padding = '10px';
+        sharesCell.style.border = '1px solid #dee2e6';
+        sharesCell.style.textAlign = 'right';
+        sharesCell.textContent = parseFloat(holding.shares).toLocaleString();
+
+        const priceCell = document.createElement('td');
+        priceCell.style.padding = '10px';
+        priceCell.style.border = '1px solid #dee2e6';
+        priceCell.style.textAlign = 'right';
+        priceCell.textContent = new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD'
+        }).format(parseFloat(holding.price));
+
+        const marketValueCell = document.createElement('td');
+        marketValueCell.style.padding = '10px';
+        marketValueCell.style.border = '1px solid #dee2e6';
+        marketValueCell.style.textAlign = 'right';
+        marketValueCell.textContent = new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD'
+        }).format(parseFloat(holding.market_value));
+
+        row.appendChild(tickerCell);
+        row.appendChild(sharesCell);
+        row.appendChild(priceCell);
+        row.appendChild(marketValueCell);
+        tbody.appendChild(row);
+      });
+    }
+
+    // Modal close functionality
+    document.addEventListener('DOMContentLoaded', function() {
+      const modal = document.getElementById('holdingsModal');
+      const closeBtn = document.querySelector('.close');
+
+      closeBtn.addEventListener('click', function() {
+        modal.style.display = 'none';
+      });
+
+      window.addEventListener('click', function(event) {
+        if (event.target === modal) {
+          modal.style.display = 'none';
+        }
+      });
+    });
+
+    // Toggle menu function
+    function toggleMenu() {
+      const sidebar = document.querySelector('.sidebar');
+      sidebar.classList.toggle('show');
+
+      // Close menu when clicking outside of it
+      if (sidebar.classList.contains('show')) {
+        document.addEventListener('click', closeMenuOutside);
+      } else {
+        document.removeEventListener('click', closeMenuOutside);
+      }
+    }
+
+    function closeMenuOutside(event) {
+      const sidebar = document.querySelector('.sidebar');
+      const menuIcon = document.querySelector('.menu-icon');
+
+      if (!sidebar.contains(event.target) && !menuIcon.contains(event.target)) {
+        sidebar.classList.remove('show');
+        document.removeEventListener('click', closeMenuOutside);
+      }
+    }
+
+    // Close menu when clicking on a link
+    document.querySelectorAll('.sidebar a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.querySelector('.sidebar').classList.remove('show');
+        document.removeEventListener('click', closeMenuOutside);
+      });
+    });
+
+    // Set default end date to today
+    document.getElementById('endDate').valueAsDate = new Date();
+  </script>
+  </div>
+</body>
+</html>

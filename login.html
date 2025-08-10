@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Login with Google</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <div id="g_id_onload"
+       data-client_id="455437681009-lvvlamnuam9j5md1p3s717tjm8r52ogf.apps.googleusercontent.com"
+       data-callback="handleCredentialResponse">
+  </div>
+
+  <div class="g_id_signin" data-type="standard"></div>
+
+  <script>
+    function handleCredentialResponse(response) {
+      // response.credential is the ID token
+      const idToken = response.credential;
+
+      // Send this ID token to your backend for verification
+      fetch('authenticate.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ id_token: idToken })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if(data.success){
+          alert('Login successful! Welcome ' + data.name);
+          // maybe redirect or update UI here
+        } else {
+          alert('Login failed: ' + data.message);
+        }
+      })
+      .catch(err => {
+        console.error('Error:', err);
+      });
+    }
+  </script>
+</body>
+</html>
