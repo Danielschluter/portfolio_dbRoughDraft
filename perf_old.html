@@ -1,0 +1,324 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Holdings Analysis</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Sans:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap');
+
+    .tbl-container {
+      background: #fff;
+      height: 400px;
+      overflow-y: scroll;
+      position: relative;
+      border: 1px solid #ccc;
+    }
+
+    .virtual-scroll-content {
+      position: relative;
+      margin-top: 0px; /* Adjust this value to match the height of the header row */
+    }
+
+
+    .header-row {
+      position: sticky;
+      top: 0;
+      background: #f1f1f1;
+      z-index: 1;
+      display: flex;
+      border-left: 1px solid #ccc;
+    }
+
+    .div-row {
+      height: 35px;
+      display: flex;
+      border-left: 1px solid #ccc;
+      background-color: #fff;
+    }
+
+    .div-row > div, .header-row > div {
+      background-color: #f8f9fa;
+      color: #433E3F;
+      margin-top: 1px;
+      margin-bottom: 1px;
+      text-align: right;
+      font-family: "Inter", serif;
+      font-size: 14px;
+      padding: 6px;
+      border-right: 1px solid #ccc;
+      border-bottom: 1px solid #ccc;
+      flex: 1;
+      min-width: 100px;
+      box-sizing: border-box;
+    }
+
+    .div-row > div:nth-child(-n + 3), .header-row > div:nth-child(-n + 3) {
+      text-align: left;
+    }
+
+    .div-row > div:nth-child(3), .header-row > div:nth-child(3) {
+      flex: 3;
+    }
+
+    .header-row > div {
+      background-color: #f1f1f1;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="sidebar">
+    <a href="index.php">Home</a>
+    <a href="pivot.html">Pivoted Data</a>
+    <a href="edgardata.html">Data By Tag</a>
+    <a class="active" href="holdings.html">Portfolio Holdings</a>
+  </div>
+
+  <div class="content">
+
+  <p><b>Separate funds by comma:</b></p>
+
+    <label for="fname">Funds:</label>
+    <input type="text" id="fname" name="fname" >
+    <label for="lname">Weights:</label>
+    <input type="text" id="lname" name="lname" >
+    <button onclick="showHint()">Show Holdings</button>
+
+    <button id="exportBtn" class="green" onclick="exportTableToCSV('holdings_data.csv')">Export to CSV</button>
+
+  <p>Holdings: <span id="txtHint"></span></p>
+
+
+  <div class="tbl-container">
+    <div class="header-row" id="dynamicHeader">
+      <!-- Header columns will be dynamically inserted here -->
+    </div>
+    <div class="virtual-scroll-content"></div>
+  </div>
+
+  <script>
+    function createHeaderColumns(data) {
+      if (!data || data.length === 0) return;
+
+      const headerRow = document.getElementById('dynamicHeader');
+      const firstRow = data[0];
+
+      // Create header columns from the keys of the first row
+      Object.keys(firstRow).forEach(key => {
+        const headerDiv = document.createElement('div');
+        headerDiv.textContent = key;
+        headerRow.appendChild(headerDiv);
+      });
+    }
+
+    // Fetch data from src/sift.php with parameters fname and lname
+    function showHint() {
+        // Clear existing content
+        const container = document.querySelector('.tbl-container');
+        const headerRow = document.getElementById('dynamicHeader');
+        const virtualContent = container.querySelector('.virtual-scroll-content');
+
+        headerRow.innerHTML = '';
+        virtualContent.innerHTML = '';
+
+        const fname = document.getElementById("fname").value;
+        const lname = document.getElementById("lname").value;
+        fetch('performance_query.php?acct_num=' + fname)
+            .then(response => response.json())
+            .then(data => {
+                createHeaderColumns(data);
+                const container = document.querySelector('.tbl-container');
+                new VirtualScroll(container, data);
+            })
+            .catch(error => {
+                console.error('Error fetching data:', error);
+            });
+    }
+
+    class VirtualScroll {
+      constructor(container, data) {
+        this.container = container;
+        container.__virtualScroll = this;
+        this.itemHeight = 35;
+        this.content = container.querySelector('.virtual-scroll-content');
+        this.originalData = data;
+        this.data = [...data];
+        this.totalItems = data.length;
+        this.visibleItems = Math.ceil(container.clientHeight / this.itemHeight);
+        this.cachedRows = new Map();
+        this.sortColumn = null;
+        this.sortAscending = true;
+
+        this.setupScroll();
+        this.setupSorting();
+        this.setupFiltering();
+        this.render();
+
+        this.container.addEventListener('scroll', () => {
+          window.requestAnimationFrame(() => this.render());
+        });
+      }
+
+      setupSorting() {
+        const headers = this.container.querySelectorAll('.header-row > div');
+        headers.forEach((header, index) => {
+          header.style.cursor = 'pointer';
+          header.addEventListener('click', () => this.sort(index));
+        });
+      }
+
+      setupFiltering() {
+        const filterRow = document.createElement('div');
+        filterRow.className = 'header-row';
+        filterRow.style.top = '35px';
+
+        const headers = this.container.querySelectorAll('.header-row > div');
+        headers.forEach(() => {
+          /*const filterInput = document.createElement('input');
+          filterInput.type = 'text';
+          filterInput.style.width = '90%';
+          filterInput.style.margin = '2px';
+          filterInput.addEventListener('input', () => this.filter());
+          const filterDiv = document.createElement('div');
+          filterDiv.appendChild(filterInput);
+          filterRow.appendChild(filterDiv);*/
+        });
+
+        this.container.insertBefore(filterRow, this.content);
+      }
+
+      sort(columnIndex) {
+        const headers = Array.from(this.container.querySelectorAll('.header-row > div'));
+        const columnKey = headers[columnIndex].textContent;
+
+        if (this.sortColumn === columnKey) {
+          this.sortAscending = !this.sortAscending;
+        } else {
+          this.sortColumn = columnKey;
+          this.sortAscending = true;
+        }
+
+        this.data.sort((a, b) => {
+          const valueA = a[columnKey];
+          const valueB = b[columnKey];
+
+          // Handle numeric values
+          if (!isNaN(valueA) && !isNaN(valueB)) {
+            return this.sortAscending ? valueA - valueB : valueB - valueA;
+          }
+
+          // Handle string values
+          const comparison = String(valueA).localeCompare(String(valueB));
+          return this.sortAscending ? comparison : -comparison;
+        });
+
+        this.cachedRows.clear();
+        this.render();
+      }
+
+      filter() {
+        const filterInputs = Array.from(this.container.querySelectorAll('.header-row:nth-child(2) input'));
+        const filterValues = filterInputs.map(input => input.value.toLowerCase());
+
+        this.data = this.originalData.filter(row => {
+          return row.some((cell, index) => {
+            const filterValue = filterValues[index];
+            return !filterValue || cell.toString().toLowerCase().includes(filterValue);
+          });
+        });
+
+        this.totalItems = this.data.length;
+        this.setupScroll();
+        this.cachedRows.clear();
+        this.render();
+      }
+
+      createRow(rowData, index) {
+        if (this.cachedRows.has(index)) {
+          return this.cachedRows.get(index);
+        }
+
+        const row = document.createElement('div');
+        row.className = 'div-row';
+        console.log("rowData:", rowData);
+
+        for (let x in rowData) {
+          const cell = document.createElement('div');
+          cell.textContent = rowData[x];
+          row.appendChild(cell);
+        }
+
+       /* rowData.forEach(cellData => {
+          const cell = document.createElement('div');
+          cell.textContent = cellData;
+          row.appendChild(cell);
+        });*/
+
+        this.cachedRows.set(index, row);
+        return row;
+      }
+
+      setupScroll() {
+        this.content.style.height = `${this.totalItems * this.itemHeight}px`;
+      }
+
+      render() {
+        const scrollTop = this.container.scrollTop;
+        const startIndex = Math.floor(scrollTop / this.itemHeight);
+        const endIndex = Math.min(startIndex + this.visibleItems + 2, this.totalItems);
+
+        this.content.innerHTML = '';
+
+        for(let i = startIndex; i < endIndex; i++) {
+          if (i >= 0 && i < this.data.length) {
+            const row = this.createRow(this.data[i], i);
+            row.style.position = 'absolute';
+            row.style.top = `${i * this.itemHeight}px`;
+            row.style.width = '100%';
+            this.content.appendChild(row);
+          }
+        }
+      }
+    }
+    function exportTableToCSV(filename) {
+      const header = document.querySelector('.header-row');
+      const headerCells = header.querySelectorAll('div');
+      const virtualScroll = document.querySelector('.tbl-container').__virtualScroll;
+      const data = virtualScroll.data;
+
+      let csv = [];
+
+      // Add header
+      let headerRow = [];
+      headerCells.forEach(cell => {
+        headerRow.push(`"${cell.textContent}"`);
+      });
+      csv.push(headerRow.join(','));
+
+      // Add all rows from data
+      data.forEach(rowData => {
+        let row = [];
+        for (let key in rowData) {
+          row.push(`"${rowData[key]}"`);
+        }
+        csv.push(row.join(','));
+      });
+
+      // Download CSV
+      const csvContent = csv.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', filename);
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+
+  </div>
+</body>
+</html>

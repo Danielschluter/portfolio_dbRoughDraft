@@ -1,324 +1,458 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Holdings Analysis</title>
-  <link rel="stylesheet" href="css/style.css" />
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Sans:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap');
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Holdings Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/mathjs@14.6.0/lib/browser/math.min.js"></script>
+    <link rel="stylesheet" href="css/style.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        /* ==================== GLOBAL STYLES ==================== */
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
 
-    .tbl-container {
-      background: #fff;
-      height: 400px;
-      overflow-y: scroll;
-      position: relative;
-      border: 1px solid #ccc;
-    }
+        /* ==================== LAYOUT STYLES ==================== */
+        .sidebar {
+            width: 200px;
+            background: #2c3e50;
+            position: fixed;
+            height: 100vh;
+            padding: 20px 0;
+        }
 
-    .virtual-scroll-content {
-      position: relative;
-      margin-top: 0px; /* Adjust this value to match the height of the header row */
-    }
+        .sidebar a {
+            display: block;
+            color: white;
+            padding: 15px 20px;
+            text-decoration: none;
+            border-bottom: 1px solid #34495e;
+        }
 
+        .sidebar a:hover, .sidebar a.active {
+            background-color: #3498db;
+        }
 
-    .header-row {
-      position: sticky;
-      top: 0;
-      background: #f1f1f1;
-      z-index: 1;
-      display: flex;
-      border-left: 1px solid #ccc;
-    }
+        .content {
+            margin-left: 220px;
+            padding: 20px;
+        }
 
-    .div-row {
-      height: 35px;
-      display: flex;
-      border-left: 1px solid #ccc;
-      background-color: #fff;
-    }
+        /* ==================== FORM STYLES ==================== */
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
 
-    .div-row > div, .header-row > div {
-      background-color: #f8f9fa;
-      color: #433E3F;
-      margin-top: 1px;
-      margin-bottom: 1px;
-      text-align: right;
-      font-family: "Inter", serif;
-      font-size: 14px;
-      padding: 6px;
-      border-right: 1px solid #ccc;
-      border-bottom: 1px solid #ccc;
-      flex: 1;
-      min-width: 100px;
-      box-sizing: border-box;
-    }
+        .form-group {
+            margin-bottom: 15px;
+        }
 
-    .div-row > div:nth-child(-n + 3), .header-row > div:nth-child(-n + 3) {
-      text-align: left;
-    }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
 
-    .div-row > div:nth-child(3), .header-row > div:nth-child(3) {
-      flex: 3;
-    }
+        input[type="text"] {
+            width: 200px;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
 
-    .header-row > div {
-      background-color: #f1f1f1;
-      font-weight: 600;
-    }
-  </style>
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            transition: background-color 0.3s;
+        }
+
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+
+        .btn-success {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #229954;
+        }
+
+        /* ==================== TABLE STYLES ==================== */
+        .table-wrapper {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .table-container {
+            height: 500px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            position: relative;
+        }
+
+        .table-header {
+            position: sticky;
+            top: 0;
+            background: #f8f9fa;
+            z-index: 10;
+            display: flex;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .table-row {
+            display: flex;
+            border-bottom: 1px solid #e0e0e0;
+            background: white;
+            height: 40px;
+            align-items: center;
+        }
+
+        .table-row:hover {
+            background-color: #f8f9fa;
+        }
+
+        .table-cell {
+            padding: 12px;
+            font-size: 14px;
+            color: #495057;
+            border-right: 1px solid #e0e0e0;
+            flex: 1;
+            min-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .table-cell.wide {
+            flex: 2;
+        }
+
+        .table-cell.text-left {
+            text-align: left;
+        }
+
+        .table-cell.text-right {
+            text-align: right;
+        }
+
+        .table-header .table-cell {
+            font-weight: 600;
+            background: #f1f3f4;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .table-header .table-cell:hover {
+            background: #e9ecef;
+        }
+
+        /* ==================== UTILITY STYLES ==================== */
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            background: #e3f2fd;
+            color: #1565c0;
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+    </style>
 </head>
 <body>
+    <!-- ==================== SIDEBAR NAVIGATION ==================== -->
+    <nav class="sidebar">
+        <a href="index.php">Home</a>
+        <a href="pivot.html">Pivoted Data</a>
+        <a href="edgardata.html">Data By Tag</a>
+        <a class="active" href="holdings.html">Portfolio Holdings</a>
+    </nav>
 
-  <div class="sidebar">
-    <a href="index.php">Home</a>
-    <a href="pivot.html">Pivoted Data</a>
-    <a href="edgardata.html">Data By Tag</a>
-    <a class="active" href="holdings.html">Portfolio Holdings</a>
-  </div>
+    <!-- ==================== MAIN CONTENT ==================== -->
+    <main class="content">
+        <!-- Form Controls -->
+        <section class="controls">
+            <h2>Portfolio Holdings Analysis</h2>
+            <p><strong>Enter account numbers separated by commas</strong></p>
 
-  <div class="content">
+            <div class="form-group">
+                <label for="accountInput">Account Numbers:</label>
+                <input type="text" id="accountInput" placeholder="e.g., 12345, 67890">
+            </div>
 
-  <p><b>Separate funds by comma:</b></p>
+            <button class="btn btn-primary" onclick="loadHoldings()">Show Holdings</button>
+            <button class="btn btn-success" onclick="exportToCSV()" disabled id="exportButton">Export to CSV</button>
+        </section>
 
-    <label for="fname">Funds:</label>
-    <input type="text" id="fname" name="fname" >
-    <label for="lname">Weights:</label>
-    <input type="text" id="lname" name="lname" >
-    <button onclick="showHint()">Show Holdings</button>
+        <!-- Status Message -->
+        <div id="statusMessage" class="status"></div>
 
-    <button id="exportBtn" class="green" onclick="exportTableToCSV('holdings_data.csv')">Export to CSV</button>
+        <!-- Data Table -->
+        <section class="table-wrapper">
+            <div id="tableContainer" class="table-container">
+                <div class="loading">Enter account numbers and click "Show Holdings" to view data</div>
+            </div>
+        </section>
+    </main>
 
-  <p>Holdings: <span id="txtHint"></span></p>
+    <script>
+        // ==================== GLOBAL VARIABLES ====================
+        let holdingsData = [];
+        let currentSort = { column: null, ascending: true };
 
+        // ==================== MAIN FUNCTIONS ====================
 
-  <div class="tbl-container">
-    <div class="header-row" id="dynamicHeader">
-      <!-- Header columns will be dynamically inserted here -->
-    </div>
-    <div class="virtual-scroll-content"></div>
-  </div>
+        /**
+         * Load holdings data for the specified account numbers
+         */
+        async function loadHoldings() {
+            const accountInput = document.getElementById('accountInput');
+            const accountNumbers = accountInput.value.trim();
 
-  <script>
-    function createHeaderColumns(data) {
-      if (!data || data.length === 0) return;
+            if (!accountNumbers) {
+                showStatus('Please enter at least one account number', 'error');
+                return;
+            }
 
-      const headerRow = document.getElementById('dynamicHeader');
-      const firstRow = data[0];
+            showStatus('Loading holdings data...', 'loading');
 
-      // Create header columns from the keys of the first row
-      Object.keys(firstRow).forEach(key => {
-        const headerDiv = document.createElement('div');
-        headerDiv.textContent = key;
-        headerRow.appendChild(headerDiv);
-      });
-    }
+            try {
+                const response = await fetch(`performance_query.php?acct_num=${encodeURIComponent(accountNumbers)}`);
 
-    // Fetch data from src/sift.php with parameters fname and lname
-    function showHint() {
-        // Clear existing content
-        const container = document.querySelector('.tbl-container');
-        const headerRow = document.getElementById('dynamicHeader');
-        const virtualContent = container.querySelector('.virtual-scroll-content');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
 
-        headerRow.innerHTML = '';
-        virtualContent.innerHTML = '';
+                const data = await response.json();
 
-        const fname = document.getElementById("fname").value;
-        const lname = document.getElementById("lname").value;
-        fetch('performance_query.php?acct_num=' + fname)
-            .then(response => response.json())
-            .then(data => {
-                createHeaderColumns(data);
-                const container = document.querySelector('.tbl-container');
-                new VirtualScroll(container, data);
-            })
-            .catch(error => {
-                console.error('Error fetching data:', error);
+                if (!data || data.length === 0) {
+                    showStatus('No data found for the specified account numbers', 'warning');
+                    return;
+                }
+
+                holdingsData = data;
+                renderTable(data);
+                enableExport();
+                showStatus(`Loaded ${data.length} holdings records`, 'success');
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showStatus('Error loading data. Please try again.', 'error');
+            }
+        }
+
+        /**
+         * Render the data table
+         */
+        function renderTable(data) {
+            const container = document.getElementById('tableContainer');
+
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="loading">No data to display</div>';
+                return;
+            }
+
+            const returns = data.map(item => item.pct_return);
+            var totalReturn = math.prod(returns);
+            console.log(totalReturn);
+            
+            const headers = Object.keys(data[0]);
+
+            container.innerHTML = `
+                <div class="table-header">
+                    ${headers.map((header, index) => `
+                        <div class="table-cell ${getColumnAlignment(header)} ${getColumnWidth(header)}" 
+                             onclick="sortTable(${index})">
+                            ${header}
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="table-body">
+                    ${data.map(row => `
+                        <div class="table-row">
+                            ${headers.map(header => `
+                                <div class="table-cell ${getColumnAlignment(header)} ${getColumnWidth(header)}">
+                                    ${formatCellValue(row[header])}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        /**
+         * Sort the table by column
+         */
+        function sortTable(columnIndex) {
+            if (!holdingsData.length) return;
+
+            const headers = Object.keys(holdingsData[0]);
+            const columnKey = headers[columnIndex];
+
+            // Toggle sort direction if same column, otherwise default to ascending
+            if (currentSort.column === columnKey) {
+                currentSort.ascending = !currentSort.ascending;
+            } else {
+                currentSort.column = columnKey;
+                currentSort.ascending = true;
+            }
+
+            const sortedData = [...holdingsData].sort((a, b) => {
+                const valueA = a[columnKey];
+                const valueB = b[columnKey];
+
+                // Handle numeric sorting
+                if (!isNaN(valueA) && !isNaN(valueB)) {
+                    return currentSort.ascending ? valueA - valueB : valueB - valueA;
+                }
+
+                // Handle string sorting
+                const stringA = String(valueA).toLowerCase();
+                const stringB = String(valueB).toLowerCase();
+
+                if (currentSort.ascending) {
+                    return stringA.localeCompare(stringB);
+                } else {
+                    return stringB.localeCompare(stringA);
+                }
             });
-    }
 
-    class VirtualScroll {
-      constructor(container, data) {
-        this.container = container;
-        container.__virtualScroll = this;
-        this.itemHeight = 35;
-        this.content = container.querySelector('.virtual-scroll-content');
-        this.originalData = data;
-        this.data = [...data];
-        this.totalItems = data.length;
-        this.visibleItems = Math.ceil(container.clientHeight / this.itemHeight);
-        this.cachedRows = new Map();
-        this.sortColumn = null;
-        this.sortAscending = true;
-
-        this.setupScroll();
-        this.setupSorting();
-        this.setupFiltering();
-        this.render();
-
-        this.container.addEventListener('scroll', () => {
-          window.requestAnimationFrame(() => this.render());
-        });
-      }
-
-      setupSorting() {
-        const headers = this.container.querySelectorAll('.header-row > div');
-        headers.forEach((header, index) => {
-          header.style.cursor = 'pointer';
-          header.addEventListener('click', () => this.sort(index));
-        });
-      }
-
-      setupFiltering() {
-        const filterRow = document.createElement('div');
-        filterRow.className = 'header-row';
-        filterRow.style.top = '35px';
-
-        const headers = this.container.querySelectorAll('.header-row > div');
-        headers.forEach(() => {
-          /*const filterInput = document.createElement('input');
-          filterInput.type = 'text';
-          filterInput.style.width = '90%';
-          filterInput.style.margin = '2px';
-          filterInput.addEventListener('input', () => this.filter());
-          const filterDiv = document.createElement('div');
-          filterDiv.appendChild(filterInput);
-          filterRow.appendChild(filterDiv);*/
-        });
-
-        this.container.insertBefore(filterRow, this.content);
-      }
-
-      sort(columnIndex) {
-        const headers = Array.from(this.container.querySelectorAll('.header-row > div'));
-        const columnKey = headers[columnIndex].textContent;
-
-        if (this.sortColumn === columnKey) {
-          this.sortAscending = !this.sortAscending;
-        } else {
-          this.sortColumn = columnKey;
-          this.sortAscending = true;
+            renderTable(sortedData);
         }
 
-        this.data.sort((a, b) => {
-          const valueA = a[columnKey];
-          const valueB = b[columnKey];
+        /**
+         * Export table data to CSV
+         */
+        function exportToCSV() {
+            if (!holdingsData.length) {
+                showStatus('No data to export', 'error');
+                return;
+            }
 
-          // Handle numeric values
-          if (!isNaN(valueA) && !isNaN(valueB)) {
-            return this.sortAscending ? valueA - valueB : valueB - valueA;
-          }
+            const headers = Object.keys(holdingsData[0]);
+            const csvContent = [
+                // Header row
+                headers.map(header => `"${header}"`).join(','),
+                // Data rows
+                ...holdingsData.map(row => 
+                    headers.map(header => `"${row[header] || ''}"`).join(',')
+                )
+            ].join('\n');
 
-          // Handle string values
-          const comparison = String(valueA).localeCompare(String(valueB));
-          return this.sortAscending ? comparison : -comparison;
+            downloadCSV(csvContent, 'holdings_data.csv');
+            showStatus('Data exported successfully', 'success');
+        }
+
+        // ==================== UTILITY FUNCTIONS ====================
+
+        /**
+         * Show status message to user
+         */
+        function showStatus(message, type = 'info') {
+            const statusElement = document.getElementById('statusMessage');
+            statusElement.textContent = message;
+            statusElement.className = `status ${type}`;
+            statusElement.style.display = 'block';
+
+            // Auto-hide success messages after 3 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusElement.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        /**
+         * Enable the export button
+         */
+        function enableExport() {
+            const exportButton = document.getElementById('exportButton');
+            exportButton.disabled = false;
+        }
+
+        /**
+         * Get column alignment based on header name
+         */
+        function getColumnAlignment(header) {
+            const leftAlignColumns = ['name', 'symbol', 'description', 'account'];
+            return leftAlignColumns.some(col => header.toLowerCase().includes(col)) 
+                ? 'text-left' : 'text-right';
+        }
+
+        /**
+         * Get column width class
+         */
+        function getColumnWidth(header) {
+            const wideColumns = ['description', 'name'];
+            return wideColumns.some(col => header.toLowerCase().includes(col)) ? 'wide' : '';
+        }
+
+        /**
+         * Format cell values for display
+         */
+        function formatCellValue(value) {
+            if (value === null || value === undefined) return '';
+            if (typeof value === 'number') {
+                return value.toLocaleString();
+            }
+            return String(value);
+        }
+
+        /**
+         * Download CSV file
+         */
+        function downloadCSV(content, filename) {
+            const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            URL.revokeObjectURL(url);
+        }
+
+        // ==================== EVENT LISTENERS ====================
+
+        // Allow Enter key to trigger search
+        document.getElementById('accountInput').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                loadHoldings();
+            }
         });
-
-        this.cachedRows.clear();
-        this.render();
-      }
-
-      filter() {
-        const filterInputs = Array.from(this.container.querySelectorAll('.header-row:nth-child(2) input'));
-        const filterValues = filterInputs.map(input => input.value.toLowerCase());
-
-        this.data = this.originalData.filter(row => {
-          return row.some((cell, index) => {
-            const filterValue = filterValues[index];
-            return !filterValue || cell.toString().toLowerCase().includes(filterValue);
-          });
-        });
-
-        this.totalItems = this.data.length;
-        this.setupScroll();
-        this.cachedRows.clear();
-        this.render();
-      }
-
-      createRow(rowData, index) {
-        if (this.cachedRows.has(index)) {
-          return this.cachedRows.get(index);
-        }
-
-        const row = document.createElement('div');
-        row.className = 'div-row';
-        console.log("rowData:", rowData);
-
-        for (let x in rowData) {
-          const cell = document.createElement('div');
-          cell.textContent = rowData[x];
-          row.appendChild(cell);
-        }
-
-       /* rowData.forEach(cellData => {
-          const cell = document.createElement('div');
-          cell.textContent = cellData;
-          row.appendChild(cell);
-        });*/
-
-        this.cachedRows.set(index, row);
-        return row;
-      }
-
-      setupScroll() {
-        this.content.style.height = `${this.totalItems * this.itemHeight}px`;
-      }
-
-      render() {
-        const scrollTop = this.container.scrollTop;
-        const startIndex = Math.floor(scrollTop / this.itemHeight);
-        const endIndex = Math.min(startIndex + this.visibleItems + 2, this.totalItems);
-
-        this.content.innerHTML = '';
-
-        for(let i = startIndex; i < endIndex; i++) {
-          if (i >= 0 && i < this.data.length) {
-            const row = this.createRow(this.data[i], i);
-            row.style.position = 'absolute';
-            row.style.top = `${i * this.itemHeight}px`;
-            row.style.width = '100%';
-            this.content.appendChild(row);
-          }
-        }
-      }
-    }
-    function exportTableToCSV(filename) {
-      const header = document.querySelector('.header-row');
-      const headerCells = header.querySelectorAll('div');
-      const virtualScroll = document.querySelector('.tbl-container').__virtualScroll;
-      const data = virtualScroll.data;
-
-      let csv = [];
-
-      // Add header
-      let headerRow = [];
-      headerCells.forEach(cell => {
-        headerRow.push(`"${cell.textContent}"`);
-      });
-      csv.push(headerRow.join(','));
-
-      // Add all rows from data
-      data.forEach(rowData => {
-        let row = [];
-        for (let key in rowData) {
-          row.push(`"${rowData[key]}"`);
-        }
-        csv.push(row.join(','));
-      });
-
-      // Download CSV
-      const csvContent = csv.join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.setAttribute('download', filename);
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-  </script>
-
-  </div>
+    </script>
 </body>
 </html>
