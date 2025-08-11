@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>JavaScript Fetch API</title>
+    <style>
+      #tbl-container {
+        background: #fff;
+        height: 400px;
+        overflow-y: scroll;
+        position: relative;
+        border: 1px solid #ccc
+      }
+      .div-row {
+        display: flex;
+      }
+      .div-row > div {
+        flex: 1;
+        padding: 10px;
+        border: 1px solid #ccc
+      }
+      .header-row {
+        background-color: #f1f1f1;
+        font-weight: bold
+      }
+      
+    </style>
+  </head>
+<body>
+<h1>JavaScript Fetch API</h1>
+<h2>The fetch() Method</h2>
+<div id="tbl-container">Fetch a file to change this text.</div>
+
+<script>
+getText("https://stockanalysis.com/api/symbol/s/AMD/history?range=10Y&period=Daily");
+
+async function getText(file) {
+  let myObject = await fetch(file);
+  let myText = await myObject.text();
+  let myJson = JSON.parse(myText);
+  let data = myJson.data;
+  var divTable = '';
+  for (var i = 0; i < data.length; i++) {
+    divTable += '<div class="div-row">';
+    for (col in data[i]) {
+      divTable += '<div>' + data[i][col] + '</div>';
+    }
+    divTable += '</div>';
+  }
+  document.getElementById("tbl-container").innerHTML = divTable;
+  
+  //document.getElementById("demo").innerHTML = myText;
+}
+</script>
+
+</body>
+</html>
