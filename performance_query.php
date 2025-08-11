@@ -74,5 +74,5 @@ while ($row = pg_fetch_assoc($result)) {
 }
 
 header('Content-Type: application/json');
-echo json_encode($returnArr);
+echo json_encode($returnArr, JSON_NUMERIC_CHECK);
 
