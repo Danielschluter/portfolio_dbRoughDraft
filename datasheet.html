@@ -6,21 +6,74 @@
       #tbl-container {
         background: #fff;
         height: 400px;
-        overflow-y: scroll;
+        overflow: hidden;
         position: relative;
         border: 1px solid #ccc
       }
+      
+      .virtual-scroll-wrapper {
+        height: 360px; /* Container height minus header */
+        overflow-y: auto;
+        position: relative;
+      }
+
+      .virtual-scroll-spacer {
+        width: 1px;
+        pointer-events: none;
+      }
+
+      .virtual-scroll-content {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        will-change: transform;
+      }
+      
       .div-row {
         display: flex;
+        height: 40px;
+        align-items: center;
       }
+      
       .div-row > div {
         flex: 1;
         padding: 10px;
-        border: 1px solid #ccc
+        border: 1px solid #ccc;
+        background: white;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
+      
+      .div-row:hover {
+        background-color: #f8f9fa;
+      }
+      
+      .div-row > div:hover {
+        background-color: #f8f9fa;
+      }
+      
       .header-row {
+        position: sticky;
+        top: 0;
+        background: #f1f1f1;
+        z-index: 10;
+        display: flex;
+        border-bottom: 2px solid #dee2e6;
+        height: 40px;
+        align-items: center;
+      }
+      
+      .header-row > div {
         background-color: #f1f1f1;
-        font-weight: bold
+        font-weight: bold;
+        cursor: pointer;
+        user-select: none;
+      }
+      
+      .header-row > div:hover {
+        background-color: #e9ecef;
       }
       
     </style>
@@ -28,27 +81,178 @@
 <body>
 <h1>JavaScript Fetch API</h1>
 <h2>The fetch() Method</h2>
-<div id="tbl-container">Fetch a file to change this text.</div>
+<div id="tbl-container">
+  <div class="loading">Fetching data...</div>
+</div>
 
 <script>
 getText("https://stockanalysis.com/api/symbol/s/AMD/history?range=10Y&period=Daily");
 
 async function getText(file) {
-  let myObject = await fetch(file);
-  let myText = await myObject.text();
-  let myJson = JSON.parse(myText);
-  let data = myJson.data;
-  var divTable = '';
-  for (var i = 0; i < data.length; i++) {
-    divTable += '<div class="div-row">';
-    for (col in data[i]) {
-      divTable += '<div>' + data[i][col] + '</div>';
+  try {
+    let myObject = await fetch(file);
+    let myText = await myObject.text();
+    let myJson = JSON.parse(myText);
+    let data = myJson.data;
+    
+    if (!data || data.length === 0) {
+      document.getElementById("tbl-container").innerHTML = '<div class="loading">No data available</div>';
+      return;
     }
-    divTable += '</div>';
+    
+    renderTable(data);
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    document.getElementById("tbl-container").innerHTML = '<div class="loading">Error loading data</div>';
   }
-  document.getElementById("tbl-container").innerHTML = divTable;
+}
+
+/**
+ * Render the data table with virtual scrolling
+ */
+function renderTable(data) {
+  const container = document.getElementById('tbl-container');
   
-  //document.getElementById("demo").innerHTML = myText;
+  if (!data || data.length === 0) {
+    container.innerHTML = '<div class="loading">No data to display</div>';
+    return;
+  }
+  
+  const headers = Object.keys(data[0]);
+  
+  // Create virtual scroll structure
+  container.innerHTML = `
+    <div class="header-row">
+      ${headers.map(header => `
+        <div onclick="sortTable('${header}')">${header}</div>
+      `).join('')}
+    </div>
+    <div class="virtual-scroll-wrapper">
+      <div class="virtual-scroll-spacer"></div>
+      <div class="virtual-scroll-content"></div>
+    </div>
+  `;
+  
+  // Initialize virtual scrolling
+  new VirtualScroll(container, data, headers);
+}
+
+/**
+ * Virtual Scroll Implementation
+ */
+class VirtualScroll {
+  constructor(container, data, headers) {
+    this.container = container;
+    this.data = data;
+    this.headers = headers;
+    this.rowHeight = 40; // Height of each row in pixels
+    this.visibleRows = Math.ceil(360 / this.rowHeight); // Container height / row height
+    this.startIndex = 0;
+    this.endIndex = Math.min(this.visibleRows, this.data.length);
+    
+    this.scrollWrapper = container.querySelector('.virtual-scroll-wrapper');
+    this.spacer = container.querySelector('.virtual-scroll-spacer');
+    this.content = container.querySelector('.virtual-scroll-content');
+    
+    // Store reference for sorting
+    window.virtualScrollInstance = this;
+    
+    this.init();
+  }
+
+  init() {
+    // Set total height for proper scrollbar
+    const totalHeight = this.data.length * this.rowHeight;
+    this.spacer.style.height = `${totalHeight}px`;
+    
+    // Add scroll event listener
+    this.scrollWrapper.addEventListener('scroll', this.handleScroll.bind(this));
+    
+    // Initial render
+    this.renderVisibleRows();
+  }
+
+  handleScroll() {
+    const scrollTop = this.scrollWrapper.scrollTop;
+    const newStartIndex = Math.floor(scrollTop / this.rowHeight);
+    const newEndIndex = Math.min(newStartIndex + this.visibleRows + 5, this.data.length); // +5 for buffer
+    
+    if (newStartIndex !== this.startIndex || newEndIndex !== this.endIndex) {
+      this.startIndex = newStartIndex;
+      this.endIndex = newEndIndex;
+      this.renderVisibleRows();
+    }
+  }
+
+  renderVisibleRows() {
+    const visibleData = this.data.slice(this.startIndex, this.endIndex);
+    const offsetY = this.startIndex * this.rowHeight;
+    
+    this.content.style.transform = `translateY(${offsetY}px)`;
+    this.content.innerHTML = visibleData.map(row => `
+      <div class="div-row">
+        ${this.headers.map(header => `
+          <div>${row[header] || ''}</div>
+        `).join('')}
+      </div>
+    `).join('');
+  }
+
+  // Method to update data (for sorting)
+  updateData(newData) {
+    this.data = newData;
+    this.startIndex = 0;
+    this.endIndex = Math.min(this.visibleRows, this.data.length);
+    
+    const totalHeight = this.data.length * this.rowHeight;
+    this.spacer.style.height = `${totalHeight}px`;
+    this.scrollWrapper.scrollTop = 0;
+    
+    this.renderVisibleRows();
+  }
+}
+
+// Global variables for sorting
+let currentSort = { column: null, ascending: true };
+
+/**
+ * Sort the table by column
+ */
+function sortTable(columnKey) {
+  if (!window.virtualScrollInstance) return;
+  
+  const data = window.virtualScrollInstance.data;
+  
+  // Toggle sort direction if same column, otherwise default to ascending
+  if (currentSort.column === columnKey) {
+    currentSort.ascending = !currentSort.ascending;
+  } else {
+    currentSort.column = columnKey;
+    currentSort.ascending = true;
+  }
+
+  const sortedData = [...data].sort((a, b) => {
+    const valueA = a[columnKey];
+    const valueB = b[columnKey];
+
+    // Handle numeric sorting
+    if (!isNaN(valueA) && !isNaN(valueB)) {
+      return currentSort.ascending ? valueA - valueB : valueB - valueA;
+    }
+
+    // Handle string sorting
+    const stringA = String(valueA).toLowerCase();
+    const stringB = String(valueB).toLowerCase();
+
+    if (currentSort.ascending) {
+      return stringA.localeCompare(stringB);
+    } else {
+      return stringB.localeCompare(stringA);
+    }
+  });
+
+  // Update virtual scroll with sorted data
+  window.virtualScrollInstance.updateData(sortedData);
 }
 </script>
 
