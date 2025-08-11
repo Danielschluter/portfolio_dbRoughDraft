@@ -279,7 +279,7 @@
                 return;
             }
 
-            const returns = data.map(item => item.pct_return);
+            const returns = data.map(item => parseFloat(item.pct_return));
             var totalReturn = math.prod(returns);
             console.log(totalReturn);
             
