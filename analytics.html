@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<meta name="robots" content="noindex">
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Analysis Total Returns</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link href='https://fonts.googleapis.com/css?family=Lato' rel='stylesheet'>
+  <link href='https://fonts.googleapis.com/css?family=Montserrat' rel='stylesheet'>
+  <script src="https://unpkg.com/mathjs@14.3.1/lib/browser/math.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+  <style>
+    body {
+      font-family: 'Lato', sans-serif;
+      background-color: #f8f9fa;
+      color: #333;
+      margin: 0;
+      padding: 0;
+    }
+
+    .form-controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 15px;
+    }
+
+    .optimization-controls {
+      display: flex;
+      gap: 20px;
+      padding: 15px;
+      background: #fff;
+      border-radius: 5px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .optimization-controls label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .optimization-controls input[type="range"] {
+      width: 100px;
+    }
+
+    .optimization-controls input[type="number"] {
+      width: 60px;
+    }
+
+    form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      background: #f6f6f7;
+    }
+
+    input[type="text"],
+    input[type="number"] {
+      flex: 1;
+      padding: 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      transition: border 0.2s;
+      width: 120px;
+    }
+
+    #tickerTable {
+      border-collapse: collapse;
+      margin-right: 15px;
+    }
+
+    #tickerTable th,
+    #tickerTable td {
+      padding: 8px;
+      text-align: left;
+      border: none;
+    }
+
+    .remove-row {
+      background: #ff4444;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    input[type="text"]:focus {
+      border-color: #007bff;
+      outline: none;
+    }
+
+   /* button {
+      padding: 10px 16px;
+      background: #007bff;
+      color: white;
+      font-size: 14px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }*/
+
+    /*button:hover {
+      background: #0056b3;
+    }*/
+
+    #move {
+      position: fixed;
+      top: 30px;
+      left: 20px;
+      z-index: 9999;
+    }
+
+    .parent {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      grid-template-rows: auto auto;
+      gap: 10px;
+    }
+
+    .div1,
+    .div2 {
+      grid-column: span 5;
+      padding: 15px;
+      background: #fff;
+      border-radius: 6px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      overflow-y: auto;
+    }
+
+    .table-container {
+      margin-top: 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    th,
+    td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+      font-size: 14px;
+    }
+
+    th {
+      background: #5a6268;
+      color: white;
+      font-weight: bold;
+    }
+
+    tr:nth-child(even) {
+      background: #f8f9fa;
+    }
+
+    tr:hover {
+      background: #e9ecef;
+      transition: background 0.3s;
+    }
+
+    .dark-mode {
+      background-color: #343a40;
+      color: #e0e0e0;
+    }
+
+    .dark-mode table {
+      background: #495057;
+    }
+
+    .dark-mode th {
+      background: #6c757d;
+    }
+
+    .dark-mode tr:hover {
+      background: #495057;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <p id="demo"></p>
+    <div class="optimization-controls">
+      <label>
+        Risk Tolerance:
+        <input type="range" id="riskTolerance" min="1" max="10" value="5">
+      </label>
+      <label>
+        Min Weight:
+        <input type="number" id="minWeight" min="0" max="1" step="0.1" value="0.1">
+      </label>
+      <label>
+        Max Weight:
+        <input type="number" id="maxWeight" min="0" max="1" step="0.1" value="0.6">
+      </label>
+      <button type="button" id="optimizeBtn">Optimize Portfolio</button>
+      <button type="button" id="exportBtn">Export Data</button>
+      <button type="button" id="compareBtn">Compare to S&P 500</button>
+    </div>
+    <form id="tickerForm">
+      <div style="margin-bottom: 15px;">
+        <input type="file" id="csvFile" accept=".csv" style="margin-right: 10px;" />
+        <button type="button" id="uploadCSV">Upload CSV</button>
+      </div>
+      <table id="tickerTable" style="margin-bottom: 15px;">
+        <thead>
+          <tr>
+            <th>Ticker</th>
+            <th>Weight</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tickerRows">
+        </tbody>
+      </table>
+      <button type="button" id="addRow" style="margin-right: 10px;">Add Ticker</button>
+      <select id="myYear">
+        <option>2009</option>
+      </select>
+      <button type="button" id="updateButton">Update Chart</button>
+    </form>
+
+    <div class="parent">
+      <div class="div1" id="correlationMatrix"></div>
+      <div class="div2">
+        <div id="chart"></div>
+        <div class="table-container" id="tbl-container"></div>
+      </div>
+    </div>
+
+    <pre id="demo2"></pre>
+    <div id="demo3"></div>
+  </div>
+
+  <script>
+    // Portfolio optimization function
+    function optimizePortfolio() {
+      const riskTolerance = document.getElementById('riskTolerance').value;
+      const minWeight = parseFloat(document.getElementById('minWeight').value);
+      const maxWeight = parseFloat(document.getElementById('maxWeight').value);
+
+      // Simple optimization based on Sharpe ratio and constraints
+      let newWeights = [];
+      let totalWeight = 0;
+
+      for (let i = 0; i < tickers.length; i++) {
+        let ticker = tickers[i];
+        let returns = byAsset[ticker] || [];
+        let volatility = math.std(returns) || 0;
+        let weight = Math.max(minWeight, Math.min(maxWeight, 1 / volatility));
+        newWeights.push(weight);
+        totalWeight += weight;
+      }
+
+      // Normalize weights to sum to 1
+      newWeights = newWeights.map(w => w / totalWeight);
+
+      // Update weight inputs
+      document.querySelectorAll('.weight-input').forEach((input, i) => {
+        input.value = newWeights[i].toFixed(2);
+      });
+
+      updateChart();
+    }
+
+    // Export data to CSV
+    function exportData() {
+      let csv = 'Date,' + tickers.join(',') + ',Portfolio\n';
+
+      for (let date in df) {
+        let row = [date];
+        for (let ticker of tickers) {
+          row.push(df[date][ticker] || '');
+        }
+        row.push(df[date].port || '');
+        csv += row.join(',') + '\n';
+      }
+
+      const blob = new Blob([csv], {type: 'text/csv'});
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'portfolio_data.csv';
+      a.click();
+    }
+
+    // Add S&P 500 comparison
+    function compareToSP500() {
+      // Add SPY to tickers if not present
+      if (!tickers.includes('$SPY')) {
+        addTickerRow('$SPY', '0');
+        tickers.push('$SPY');
+        weights.push(0);
+        updateChart();
+      }
+    }
+
+    // CSV Upload handling
+    document.getElementById('uploadCSV').addEventListener('click', function () {
+      const fileInput = document.getElementById('csvFile');
+      const file = fileInput.files[0];
+      if (!file) {
+        alert('Please select a CSV file');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const text = e.target.result;
+        const lines = text.split('\n');
+
+        // Clear existing rows
+        document.getElementById('tickerRows').innerHTML = '';
+
+        // Process each line
+        lines.forEach(line => {
+          if (line.trim()) {
+            const [ticker, weight] = line.split(',').map(val => val.trim());
+            if (ticker && weight) {
+              addTickerRow(ticker, weight);
+            }
+          }
+        });
+      };
+      reader.readAsText(file);
+    });
+
+    // Add event listeners
+    document.getElementById('optimizeBtn').addEventListener('click', optimizePortfolio);
+    document.getElementById('exportBtn').addEventListener('click', exportData);
+    document.getElementById('compareBtn').addEventListener('click', compareToSP500);
+    // Default tickers and weights  
+    var defaultTickers = ["$BAC", "$JPM", "$MSFT"];
+    var defaultWeights = [0.3, 0.3, 0.4];
+    var tickers = [...defaultTickers];
+    var weights = [...defaultWeights];
+
+    function addTickerRow(ticker = '', weight = '') {
+      const tbody = document.getElementById('tickerRows');
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><input type="text" class="ticker-input" value="${ticker}" placeholder="e.g. $AAPL" /></td>
+        <td><input type="number" class="weight-input" value="${weight}" placeholder="e.g. 0.3" step="0.1" min="0" max="1" /></td>
+        <td><button type="button" class="remove-row">&times;</button></td>
+      `;
+      tbody.appendChild(row);
+
+      row.querySelector('.remove-row').addEventListener('click', function () {
+        if (document.querySelectorAll('.ticker-input').length > 1) {
+          row.remove();
+        }
+      });
+    }
+
+    // Initialize with default values
+    defaultTickers.forEach((ticker, i) => {
+      addTickerRow(ticker, defaultWeights[i]);
+    });
+
+    document.getElementById('addRow').addEventListener('click', () => addTickerRow());
+
+    document.getElementById("updateButton").addEventListener("click", function () {
+      const tickerInputs = document.querySelectorAll('.ticker-input');
+      const weightInputs = document.querySelectorAll('.weight-input');
+
+      tickers = Array.from(tickerInputs).map(input => input.value.trim());
+      weights = Array.from(weightInputs).map(input => parseFloat(input.value));
+
+      if (tickers.some(t => !t)) {
+        alert("Please fill in all ticker fields");
+        return;
+      }
+
+      const weightSum = weights.reduce((sum, w) => sum + w, 0);
+      if (Math.abs(weightSum - 1) > 0.0001) {
+        alert("Weights must sum to 1");
+        return;
+      }
+
+      updateChart();
+    });
+
+    function updateChart() {
+      // convert tickers to string  
+      var tickerString = tickers.join(",");
+      var myUrl = "https://api.stockanalysis.com/api/compare/multiChart?s=" + tickerString + "&ts=totalReturn";
+      // Clear previous data 
+      document.getElementById("demo").innerHTML = "";
+      document.getElementById("demo2").innerHTML = "";
+      document.getElementById("correlationMatrix").innerHTML = "";
+      // Get new data  
+      getText(myUrl);
+    }
+    // Initialize with default tickers
+    var tickerString = tickers.join(",");
+    var myUrl = "https://api.stockanalysis.com/api/compare/multiChart?s=" + tickerString + "&ts=totalReturn";
+    getText(myUrl);
+    var df = [];
+    var byTicker = [];
+    var byatickerArr = [];
+    var byAsset = [];
+
+    var tickerMetrics = {
+      cagr: [],
+      volatility: [],
+    };
+
+    async function getText(file) {
+      let myObject = await fetch(file);
+      let myText = await myObject.text();
+      var myJSON = JSON.parse(myText);
+      var data = myJSON.data;
+      let df = {};
+      let byTicker = {};
+      let byTicker2 = {};
+      let n = 0;
+      for (let series of data) {
+        let ticker = tickers[n];
+        byTicker[ticker] = {};
+        byTicker2[ticker] = [];
+        let prevValue = null;
+        var dateString = "2019-03-02T10:30:00.000Z";
+        var dateVal = (date = new Date(dateString));
+        var timestamp = dateVal.getTime();
+
+        var pickYear = document.getElementById("myYear").value;
+
+        var unixArr = [441666000000, 444430800000, 446936400000, 449528400000, 452206800000, 454885200000, 457390800000, 460155600000, 462834000000, 465253200000, 468104400000, 470696400000, 473374800000, 476053200000, 478472400000, 480978000000, 483742800000, 486421200000, 488840400000, 491691600000, 494283600000, 496962000000, 499640400000, 502146000000, 504910800000, 507589200000, 510008400000, 512686800000, 515278800000, 517870800000, 520549200000, 523227600000, 525733200000, 528498000000, 531176400000, 533595600000, 536446800000, 539038800000, 541458000000, 544222800000, 546814800000, 549320400000, 552085200000, 554763600000, 557442000000, 560034000000, 562626000000, 565304400000, 567982800000, 570488400000, 573166800000, 575845200000, 578350800000, 581115600000, 583707600000, 586213200000, 589064400000, 591656400000, 594334800000, 596926800000, 599518800000, 602283600000, 604702800000, 607381200000, 609800400000, 612651600000, 615243600000, 617922000000, 620600400000, 623106000000, 625870800000, 628462800000, 630968400000, 633819600000, 636238800000, 638830800000, 641509200000, 644187600000, 646693200000, 649458000000, 652136400000, 654555600000, 657406800000, 659998800000, 662677200000, 665355600000, 667774800000, 670194000000, 673045200000, 675723600000, 678142800000, 680994000000, 683586000000, 686264400000, 688942800000, 691448400000, 694213200000, 696891600000, 699310800000, 702075600000, 704667600000, 707173200000, 709938000000, 712616400000, 715294800000, 717886800000, 720478800000, 723157200000, 725835600000, 728341200000, 730760400000, 733611600000, 736203600000, 738622800000, 741474000000, 744066000000, 746830800000, 749422800000, 751928400000, 754693200000, 757371600000, 760050000000, 762469200000, 765147600000, 767653200000, 770418000000, 773010000000, 775515600000, 778366800000, 780958800000, 783637200000, 786229200000, 788821200000, 791586000000, 794005200000, 796683600000, 799102800000, 801954000000, 804546000000, 807224400000, 809902800000, 812408400000, 815173200000, 817765200000, 820270800000, 823122000000, 825627600000, 828133200000, 830898000000, 833576400000, 835995600000, 838846800000, 841438800000, 844117200000, 846795600000, 849301200000, 852066000000, 854744400000, 857163600000, 859842000000, 862434000000, 865026000000, 867704400000, 870382800000, 872888400000, 875653200000, 878331600000, 880750800000, 883602000000, 886194000000, 888613200000, 891378000000, 893970000000, 896475600000, 899240400000, 901918800000, 904597200000, 907189200000, 909781200000, 912459600000, 915138000000, 917643600000, 920062800000, 922914000000, 925506000000, 927925200000, 930776400000, 933368400000, 936133200000, 938725200000, 941230800000, 943995600000, 946674000000, 949352400000, 951858000000, 954536400000, 956955600000, 959806800000, 962398800000, 965077200000, 967755600000, 970261200000, 973026000000, 975618000000, 978123600000, 980974800000, 983394000000, 985986000000, 988664400000, 991342800000, 993848400000, 996613200000, 999291600000, 1001710800000, 1004562000000, 1007154000000, 1009832400000, 1012510800000, 1014930000000, 1017349200000, 1020200400000, 1022878800000, 1025298000000, 1028149200000, 1030741200000, 1033419600000, 1036098000000, 1038603600000, 1041368400000, 1044046800000, 1046466000000, 1049144400000, 1051736400000, 1054328400000, 1057006800000, 1059685200000, 1062190800000, 1064955600000, 1067634000000, 1070053200000, 1072904400000, 1075496400000, 1077915600000, 1080766800000, 1083358800000, 1085778000000, 1088629200000, 1091221200000, 1093986000000, 1096578000000, 1099083600000, 1101848400000, 1104526800000, 1107205200000, 1109624400000, 1112302800000, 1114808400000, 1117573200000, 1120165200000, 1122670800000, 1125522000000, 1128114000000, 1130792400000, 1133384400000, 1135976400000, 1138741200000, 1141160400000, 1143838800000, 1146258000000, 1149109200000, 1151701200000, 1154379600000, 1157058000000, 1159563600000, 1162328400000, 1164920400000, 1167426000000, 1170277200000, 1172696400000, 1175288400000, 1177966800000, 1180645200000, 1183150800000, 1185915600000, 1188594000000, 1191013200000, 1193864400000, 1196456400000, 1199134800000, 1201813200000, 1204318800000, 1206997200000, 1209589200000, 1212181200000, 1214859600000, 1217538000000, 1220043600000, 1222808400000, 1225486800000, 1227906000000, 1230757200000, 1233349200000, 1235768400000, 1238533200000, 1241125200000, 1243630800000, 1246395600000, 1249074000000, 1251752400000, 1254344400000, 1256936400000, 1259614800000, 1262293200000, 1264798800000, 1267218000000, 1270069200000, 1272661200000, 1275080400000, 1277931600000, 1280523600000, 1283288400000, 1285880400000, 1288386000000, 1291150800000, 1293829200000, 1296507600000, 1298926800000, 1301605200000, 1304110800000, 1306875600000, 1309467600000, 1311973200000, 1314824400000, 1317416400000, 1320094800000, 1322686800000, 1325278800000, 1328043600000, 1330549200000, 1333141200000, 1335819600000, 1338498000000, 1341003600000, 1343768400000, 1346446800000, 1348866000000, 1351717200000, 1354309200000, 1356987600000, 1359666000000, 1362085200000, 1364504400000, 1367355600000, 1370034000000, 1372453200000, 1375304400000, 1377896400000, 1380574800000, 1383253200000, 1385758800000, 1388523600000, 1391202000000, 1393621200000, 1396299600000, 1398891600000, 1401483600000, 1404162000000, 1406840400000, 1409346000000, 1412110800000, 1414789200000, 1417208400000, 1420059600000, 1422651600000, 1425070800000, 1427835600000, 1430427600000, 1432933200000, 1435698000000, 1438376400000, 1441054800000, 1443646800000, 1446238800000, 1448917200000, 1451595600000, 1454101200000, 1456779600000, 1459458000000, 1461963600000, 1464728400000, 1467320400000, 1469826000000, 1472677200000, 1475269200000, 1477947600000, 1480539600000, 1483131600000, 1485896400000, 1488315600000, 1490994000000, 1493413200000, 1496264400000, 1498856400000, 1501534800000, 1504213200000, 1506718800000, 1509483600000, 1512075600000, 1514581200000, 1517432400000, 1519851600000, 1522357200000, 1525122000000, 1527800400000, 1530306000000, 1533070800000, 1535749200000, 1538168400000, 1541019600000, 1543611600000, 1546290000000, 1548968400000, 1551387600000, 1553893200000, 1556658000000, 1559336400000, 1561755600000, 1564606800000, 1567198800000, 1569877200000, 1572555600000, 1575061200000, 1577826000000, 1580504400000, 1582923600000, 1585688400000, 1588280400000, 1590786000000, 1593550800000, 1596229200000, 1598907600000, 1601499600000, 1604091600000, 1606770000000, 1609448400000, 1611954000000, 1614373200000, 1617224400000, 1619816400000, 1622235600000, 1625086800000, 1627678800000, 1630443600000, 1633035600000, 1635541200000, 1638306000000, 1640984400000, 1643662800000, 1646082000000, 1648760400000, 1651266000000, 1654030800000, 1656622800000, 1659128400000, 1661979600000, 1664571600000, 1667250000000, 1669842000000, 1672434000000, 1675198800000, 1677618000000, 1680296400000, 1682715600000, 1685566800000, 1688158800000, 1690837200000, 1693515600000, 1696021200000, 1698786000000, 1701378000000, 1703883600000, 1706734800000, 1709240400000, 1711659600000, 1714510800000, 1717189200000, 1719608400000, 1722459600000, 1725051600000, 1727730000000, 1730408400000, 1732914000000, 1735678800000, 1738357200000, 1740776400000, 1743454800000, 1744146000000, 1744146000000, 1744146000000, 1744146000000, 1744146000000, 1744146000000, 1744146000000, 1744146000000, 1744146000000];
+
+        var minDate = new Date(pickYear, 1, 0, 16);
+        var minUnix = minDate.getTime();
+
+        var dateArr = unixArr.filter((u) => u > minUnix);
+        console.log("dateArr", dateArr);
+
+
+
+
+        var after = timestamp;
+        for (let point of series) {
+          let dateVal = point[0];
+          // Check if dateVal is in the datesArr  
+          if (dateArr.includes(dateVal)) {
+            let date = new Date(point[0]);
+            let dateString = date.toLocaleDateString("en-US");
+            let currentValue = point[1];
+            console.log("currentValue", currentValue);
+            if (!df[dateString]) {
+              df[dateString] = {};
+            }
+            if (prevValue !== null) {
+              let percentChange = ((currentValue - prevValue) / prevValue) * 100;
+              var roundedPercentChange = Math.round(percentChange * 100) / 100;
+              df[dateString][ticker] = parseFloat(percentChange.toFixed(4));
+            } else {
+              df[dateString][ticker] = 0;
+            }
+            byTicker[ticker][dateString] = currentValue;
+            byTicker2[ticker].push(roundedPercentChange);
+            prevValue = currentValue;
+          }
+        }
+        n++;
+      }
+      var pReturns = [];
+      let l = df.length;
+      for (let x in df) {
+        var returns = df[x];
+        var r = [];
+        // Ensure we have values for all tickers
+        for (let i = 0; i < tickers.length; i++) {
+          r.push(returns[tickers[i]] || 0);
+        }
+        console.log("returns", returns);
+        var m = math.multiply(r, weights);
+        m = math.round(m, 4);
+        pReturns.push(m);
+        df[x].port = m;
+      }
+      console.log("pReturns", pReturns);
+
+      // Calculate portfolio return  
+      calculatePortfolioReturn(byTicker);
+      generateCorrelationMatrix(byTicker);
+      var initialBalance = 10000;
+      var balances = [];
+      balances.push(initialBalance);
+      var chartDates = [];
+      var txt = "";
+      txt += "<table><tr><th>Date</th>";
+      // Generate Headers
+      for (let heading of tickers) {
+        txt += "<th>" + heading + "</th>";
+      }
+      txt += "<th>Portfolio</th><th>Balance</th></tr>";
+
+      var n2 = 0;
+      for (let d in df) {
+        txt += "<tr><td>" + d + "</td>";
+
+        var prices = df[d];
+        for (let p in prices) {
+          txt += "<td>" + prices[p] + "%</td>";
+        }
+
+        for (let n in prices) {
+          var asset = n;
+          var ret = prices[n];
+          if (!byAsset[asset]) {
+            byAsset[asset] = [];
+          }
+          byAsset[asset].push(ret);
+        }
+
+
+        var pR = math.sum(1, pReturns[n2] / 100);
+        var prevBalance = balances[balances.length - 1];
+        var newBalance = math.multiply(pR, prevBalance);
+        newBalance = math.round(newBalance, 2);
+        balances.push(newBalance);
+        chartDates.push(d);
+        txt += "<td>$" + math.round(newBalance, 2).toLocaleString() + "</td>";
+        //txt += "<td>" + pReturns[n2].toFixed(4) + "</td>";
+        n2++;
+        txt += "</tr>";
+      }
+      txt += "</table>";
+      console.log("byAsset", byAsset);
+
+      // Generate Chart  
+      var options = {
+        chart: {
+          type: 'line',
+          height: 350,
+          zoom: {
+            enabled: false
+          }
+        },
+        series: [{
+          name: 'Portfolio',
+          data: balances
+        }],
+        xaxis: {
+          categories: chartDates
+        },
+        stroke: {
+          width: 2
+        },
+        colors: ['#008FFB', '#00E396'],
+        legend: {
+          show: true,
+          position: 'top'
+        }
+      };
+
+      // Add SPY series if it exists
+      if (byTicker['$SPY']) {
+        let spyBalances = [10000];
+        let currentBalance = 10000;
+        Object.values(df).forEach(day => {
+          if (day['$SPY']) {
+            currentBalance *= (1 + day['$SPY'] / 100);
+            spyBalances.push(currentBalance);
+          }
+        });
+        options.series.push({
+          name: 'S&P 500',
+          data: spyBalances
+        });
+      }
+
+      var chart = new ApexCharts(document.querySelector("#chart"), options);
+      chart.render();
+      var volatility = math.std(pReturns);
+      var annualVolatility = math.multiply(math.sqrt(12), volatility);
+      // Calculate CAGR 
+
+      var firstVal = 100; // Starting value of $100  
+
+      var lastVal = firstVal;
+      for (let ret of pReturns) {
+        lastVal *= (1 + ret / 100);
+      }
+      var years = pReturns.length / 12;
+      var cagr = (Math.pow(lastVal / firstVal, 1 / years) - 1) * 100;
+      // Calculate risk metrics  function 
+
+      function calculateRiskMetrics(returns, weights) {
+        let covMatrix = math.zeros([tickers.length, tickers.length]);
+        // Calculate covariance matrix
+        for (let i = 0; i < tickers.length; i++) {
+          for (let j = 0; j < tickers.length; j++) {
+            let returnsI = Object.values(returns).map(r => r[tickers[i]] || 0);
+            let returnsJ = Object.values(returns).map(r => r[tickers[j]] || 0);
+            covMatrix[i][j] = calculateCovariance(returnsI, returnsJ);
+          }
+        }
+        // Calculate portfolio variance
+        let portVariance = 0;
+        for (let i = 0; i < tickers.length; i++) {
+          for (let j = 0; j < tickers.length; j++) {
+            portVariance += weights[i] * weights[j] * covMatrix[i][j];
+          }
+        }
+        // Calculate MCTR and ACTR for each position  
+        let riskMetrics = {};
+        let portRisk = Math.sqrt(portVariance);
+        for (let i = 0; i < tickers.length; i++) {
+          let mctr = 0;
+          for (let j = 0; j < tickers.length; j++) {
+            mctr += weights[j] * covMatrix[i][j];
+          }
+          mctr /= portRisk;
+          let actr = weights[i] * mctr;
+          let pctRisk = (actr / portRisk) * 100;
+          riskMetrics[tickers[i]] = {
+            mctr: mctr,
+            actr: actr,
+            pctRisk: pctRisk
+          };
+        }
+        return riskMetrics;
+      }
+
+      function calculateCovariance(x, y) {
+        let meanX = math.mean(x);
+        let meanY = math.mean(y);
+        let n = x.length;
+        let sum = 0;
+        for (let i = 0; i < n; i++) {
+          sum += (x[i] - meanX) * (y[i] - meanY);
+        }
+        return sum / (n - 1);
+      }
+
+      let riskMetrics = calculateRiskMetrics(df, weights);
+      var metricsHtml = ` 
+        <br>
+        <div style="margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px;"> 
+          <h3 style="margin-bottom: 15px;">Portfolio Metrics</h3>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+            <div><b>Portfolio CAGR:</b> ${cagr.toFixed(2)}%</div>
+            <div><strong>Portfolio Volatility:</strong> ${annualVolatility.toFixed(2)}%</div>
+            ${tickers.map(ticker => `
+              <div><strong>${ticker} CAGR:</strong> ${(tickerMetrics.cagr.find(t => t.ticker === ticker)?.cagr || 0).toFixed(2)}%</div>
+              <div><strong>${ticker} Volatility:</strong> ${(tickerMetrics.volatility.find(t => t.ticker === ticker)?.volatility || 0).toFixed(2)}%</div>
+            `).join('')}
+          </div>
+        </div> <h2 style="margin-top: 15px;">Risk Metrics by Position</h2> <table style="width: 100%; margin-top: 10px;"> <tr> <th>Position</th> <th>Weight</th> <th>MCTR</th> <th>ACTR</th> <th>% Risk</th> </tr>  ${tickers.map((ticker, i) => ` <tr> <td>${ticker}</td> <td>${(weights[i] * 100).toFixed(1)}%</td> <td>${riskMetrics[ticker].mctr.toFixed(4)}</td> <td>${riskMetrics[ticker].actr.toFixed(4)}</td> <td>${riskMetrics[ticker].pctRisk.toFixed(1)}%</td> </tr>  `).join('')} </table> </div>  `;
+      // Run Monte Carlo simulation  
+
+      var numSimulations = 1000;
+      var forecastMonths = 12;
+      var confidenceIntervals = [0.05, 0.25, 0.5, 0.75, 0.95];
+
+      function runMonteCarlo(returns, initialValue) {
+        let paths = [];
+        let meanReturn = math.mean(returns);
+        let stdDev = math.std(returns);
+        for (let sim = 0; sim < numSimulations; sim++) {
+          let path = [initialValue];
+          let currentValue = initialValue;
+          for (let month = 0; month < forecastMonths; month++) {
+            // Generate random return using normal distribution  
+            let randomReturn = math.random(meanReturn - 2 * stdDev, meanReturn + 2 * stdDev);
+            currentValue *= (1 + randomReturn / 100);
+            path.push(currentValue);
+          }
+          paths.push(path);
+        }
+        // Calculate percentiles for confidence intervals  
+        let finalValues = paths.map(path => path[path.length - 1]);
+        let percentiles = confidenceIntervals.map(ci => {
+          return {
+            ci: ci * 100,
+            value: math.quantileSeq(finalValues, ci)
+          };
+        });
+        return {
+          paths: paths,
+          percentiles: percentiles
+        };
+      }
+
+      var monteCarloResults = runMonteCarlo(pReturns, 100);
+      var monteCarloHtml = ` <div style="margin: 20px 0; font-family: 'Montserrat', serif;"> <h3>Monte Carlo Simulation Results (${numSimulations} simulations over ${forecastMonths} months)</h3> <div style="margin: 10px 0;">Starting value: $100</div> <div>Confidence Intervals for Final Portfolio Value:</div>  ${monteCarloResults.percentiles.map(p => `<div>${p.ci}th percentile: $${p.value.toFixed(2)}</div>`).join('')} </div>  `;
+      document.getElementById("tbl-container").innerHTML = metricsHtml + monteCarloHtml + txt + "<hr />";
+
+      document.getElementById("demo2").innerHTML = JSON.stringify(byTicker, null, 2) + "<hr />" + JSON.stringify(byTicker2, null, 2);
+
+
+      for (let t in byTicker) {
+        var tickerReturns = Object.values(byTicker[t]);
+        var periodicReturns = [];
+        for (let i = 1; i < tickerReturns.length; i++) {
+          let returnPct = ((tickerReturns[i] - tickerReturns[i - 1]) / tickerReturns[i - 1]) * 100;
+          periodicReturns.push(returnPct);
+        }
+        var tickerVolatility = math.std(periodicReturns);
+        var tickerAnnualVolatility = math.multiply(math.sqrt(12), tickerVolatility);
+
+        var endVal = tickerReturns[tickerReturns.length - 1];
+        var startVal = tickerReturns[0];
+
+        var tickerCagr = (Math.pow(endVal / startVal, 1 / (tickerReturns.length / 12)) - 1) * 100;
+
+        tickerMetrics.cagr.push({
+          ticker: t,
+          cagr: tickerCagr
+        })
+        tickerMetrics.volatility.push({
+          ticker: t,
+          volatility: tickerAnnualVolatility
+        })
+
+      }
+
+
+      console.log("byTicker:", byTicker);
+      console.log("byTicker2", byTicker2);
+      console.log("Data:", df);
+      console.log("Ticker Metrics:", tickerMetrics);
+
+      var metricTbl = '';
+      /*metricTbl += "<table>";
+      // Add row for cagr
+      metricTbl += "<tr><th>Ticker</th><th>CAGR</th><th>Volatility</th></tr>";
+      for (let t in tickerMetrics.cagr) {
+        metricTbl += "<tr><td>" + tickerMetrics.cagr[t].ticker + "</td><td>" + tickerMetrics.cagr[t].cagr.toFixed(2) + "</td><td>" + tickerMetrics.volatility[t].volatility.toFixed(2) + "</td></tr>";
+
+      }
+      metricTbl += "</table>";
+      console.log("im here!!", byTicker2, pReturns);*/
+
+      var activeReturns = [];
+      // Check if $SPY key exists in byTicker2
+      if (byTicker2['$SPY']) {
+        for (let i = 0; i < byTicker2['$SPY'].length; i++) {
+          activeReturns.push(pReturns[i] - byTicker2['$SPY'][i]);
+        }
+      }
+
+      var activeRisk = math.std(activeReturns);
+      var activeAnnualRisk = math.multiply(math.sqrt(12), activeRisk);
+      metricTbl += "<br><b>Active Risk:</b> " + activeAnnualRisk.toFixed(2) + "%";
+
+      document.getElementById("demo3").innerHTML = metricTbl;
+
+
+
+    }
+
+    function calculatePortfolioReturn(byTicker) {
+      let portfolioReturns = {};
+      for (let date in byTicker[tickers[0]]) {
+        let totalReturn = 0;
+        for (let i = 0; i < tickers.length; i++) {
+          let ticker = tickers[i];
+          let weight = weights[i];
+          let returnValue = byTicker[ticker][date] || 0;
+          totalReturn += returnValue * weight;
+        }
+        portfolioReturns[date] = totalReturn.toFixed(4);
+      }
+      console.log("Portfolio Returns:", portfolioReturns);
+    }
+
+    function generateCorrelationMatrix(byTicker) {
+      let returnsData = {};
+      for (let ticker of tickers) {
+        returnsData[ticker] = Object.values(byTicker[ticker]);
+      }
+      let correlationMatrix = [];
+      for (let i = 0; i < tickers.length; i++) {
+        correlationMatrix[i] = [];
+        for (let j = 0; j < tickers.length; j++) {
+          correlationMatrix[i][j] = calculateCorrelation(returnsData[tickers[i]], returnsData[tickers[j]]);
+        }
+      }
+      displayCorrelationMatrix(correlationMatrix);
+    }
+
+    function calculateCorrelation(x, y) {
+      let n = x.length;
+      let sumX = x.reduce((a, b) => a + b, 0);
+      let sumY = y.reduce((a, b) => a + b, 0);
+      let sumXY = x.reduce((sum, xi, i) => sum + xi * y[i], 0);
+      let sumX2 = x.reduce((sum, xi) => sum + xi * xi, 0);
+      let sumY2 = y.reduce((sum, yi) => sum + yi * yi, 0);
+      let numerator = n * sumXY - sumX * sumY;
+      let denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+      return denominator === 0 ? 0 : numerator / denominator;
+    }
+
+    function displayCorrelationMatrix(matrix) {
+      // Calculate CAGR and StdDev for each ticker
+      let stats = {};
+      for (let ticker of tickers) {
+        let returns = [];
+        for (let date in byTicker[ticker]) {
+          returns.push(byTicker[ticker][date]);
+        }
+
+        if (returns.length > 0) {
+          // Calculate CAGR
+          let firstVal = returns[0];
+          let lastVal = returns[returns.length - 1];
+          let years = returns.length / 12;
+          let cagr = (Math.pow(lastVal / firstVal, 1 / years) - 1) * 100;
+
+          // Calculate returns for StdDev
+          let monthlyReturns = [];
+          for (let i = 1; i < returns.length; i++) {
+            let pctChange = ((returns[i] - returns[i - 1]) / returns[i - 1]) * 100;
+            monthlyReturns.push(pctChange);
+          }
+
+          let stdDev = monthlyReturns.length > 0 ? math.std(monthlyReturns) * Math.sqrt(12) : 0;
+
+          stats[ticker] = {
+            cagr: cagr,
+            stdDev: stdDev
+          };
+        } else {
+          stats[ticker] = {
+            cagr: 0,
+            stdDev: 0
+          };
+        }
+      }
+
+      let html = "<table id='matrixTable'><tr><th>Ticker</th>";
+      for (let ticker of tickers) {
+        html += "<th>" + ticker + "</th>";
+      }
+      html += "</tr>";
+
+      // Correlation matrix rows
+      for (let i = 0; i < matrix.length; i++) {
+        html += "<tr><td>" + tickers[i] + "</td>";
+        for (let j = 0; j < matrix[i].length; j++) {
+          html += "<td>" + matrix[i][j].toFixed(4) + "</td>";
+        }
+        html += "</tr>";
+      }
+
+
+      html += "</table>";
+
+      document.getElementById("correlationMatrix").innerHTML = html;
+    }
+
+    function myFunction() {
+      var element = document.getElementById("tickerForm");
+      element.classList.toggle("mystyle");
+    }
+
+
+    for (let j = 2010; j < 2025; j++) {
+      var xH = document.getElementById("myYear");
+      var option = document.createElement("option");
+      option.innerHTML = j;
+      xH.add(option);
+    }
+
+    // Generate HTML table from byTicker object
+    function generateTable() {
+      // Get the demo3 element
+      const demo3 = document.getElementById('demo3');
+      if (!demo3) return;
+
+      // Clear existing content
+      demo3.innerHTML = '';
+
+      // Create new table
+      const table = document.createElement('table');
+      const thead = table.createTHead();
+      const row = thead.insertRow();
+      let header = ['Ticker'];
+      for (const date in byTicker[tickers[0]]) {
+        header.push(date);
+      }
+      for (let i = 0; i < header.length; i++) {
+        const th = document.createElement('th');
+        th.textContent = header[i];
+        row.appendChild(th);
+      }
+
+      const tbody = table.createTBody();
+      tickers.forEach(ticker => {
+        const row = tbody.insertRow();
+        const cell = row.insertCell();
+        cell.textContent = ticker;
+        for (const date in byTicker[ticker]) {
+          const cell = row.insertCell();
+          cell.textContent = byTicker[ticker][date];
+        }
+      });
+      table.appendChild(tbody);
+      demo3.appendChild(table);
+    }
+  </script>
+</body>
+
+</html>
