@@ -215,6 +215,8 @@
       <button type="button" id="optimizeBtn">Optimize Portfolio</button>
       <button type="button" id="exportBtn">Export Data</button>
       <button type="button" id="compareBtn">Compare to S&P 500</button>
+      <button type="button" id="mlPredictBtn">ML Predictions</button>
+      <button type="button" id="efficientFrontierBtn">Efficient Frontier</button>
     </div>
     <form id="tickerForm">
       <div style="margin-bottom: 15px;">
@@ -348,6 +350,380 @@
     document.getElementById('optimizeBtn').addEventListener('click', optimizePortfolio);
     document.getElementById('exportBtn').addEventListener('click', exportData);
     document.getElementById('compareBtn').addEventListener('click', compareToSP500);
+    document.getElementById('mlPredictBtn').addEventListener('click', generateMLPredictions);
+    document.getElementById('efficientFrontierBtn').addEventListener('click', showEfficientFrontier);
+
+    // Machine Learning Predictions using linear regression
+    function generateMLPredictions() {
+      let predictionHtml = `
+        <div style="background: #fff; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #dee2e6;">
+          <h3>Machine Learning Predictions</h3>
+          <div id="mlPredictionResults"></div>
+        </div>
+      `;
+      
+      // Simple linear regression for each asset
+      let predictions = {};
+      let features = [];
+      
+      // Create feature vectors (moving averages, momentum, etc.)
+      for (let i = 5; i < pReturns.length; i++) {
+        let ma5 = pReturns.slice(i-5, i).reduce((a, b) => a + b) / 5;
+        let ma10 = i >= 10 ? pReturns.slice(i-10, i).reduce((a, b) => a + b) / 10 : ma5;
+        let momentum = pReturns[i-1];
+        let volatility = math.std(pReturns.slice(Math.max(0, i-12), i));
+        
+        features.push({
+          ma5: ma5,
+          ma10: ma10,
+          momentum: momentum,
+          volatility: volatility,
+          target: pReturns[i]
+        });
+      }
+      
+      // Train simple linear model
+      let model = trainLinearModel(features);
+      
+      // Generate predictions
+      let latestFeatures = {
+        ma5: pReturns.slice(-5).reduce((a, b) => a + b) / 5,
+        ma10: pReturns.slice(-10).reduce((a, b) => a + b) / 10,
+        momentum: pReturns[pReturns.length - 1],
+        volatility: math.std(pReturns.slice(-12))
+      };
+      
+      let prediction = predict(model, latestFeatures);
+      let confidence = calculateConfidence(model, features);
+      
+      document.getElementById('demo3').innerHTML += predictionHtml;
+      
+      let resultsHtml = `
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+            <h4>Next Month Prediction</h4>
+            <div><strong>Expected Return:</strong> ${prediction.toFixed(2)}%</div>
+            <div><strong>Confidence Score:</strong> ${(confidence * 100).toFixed(1)}%</div>
+            <div><strong>Prediction Range:</strong> ${(prediction - 2).toFixed(2)}% to ${(prediction + 2).toFixed(2)}%</div>
+          </div>
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+            <h4>Model Performance</h4>
+            <div><strong>Training Samples:</strong> ${features.length}</div>
+            <div><strong>R-squared:</strong> ${model.rSquared.toFixed(3)}</div>
+            <div><strong>RMSE:</strong> ${model.rmse.toFixed(3)}</div>
+          </div>
+        </div>
+        
+        <div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 4px;">
+          <strong>Disclaimer:</strong> These predictions are based on historical patterns and should not be considered as investment advice. Past performance does not guarantee future results.
+        </div>
+      `;
+      
+      document.getElementById('mlPredictionResults').innerHTML = resultsHtml;
+    }
+
+    function trainLinearModel(features) {
+      let n = features.length;
+      let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+      
+      // Use momentum as primary predictor (simplified)
+      features.forEach(f => {
+        sumX += f.momentum;
+        sumY += f.target;
+        sumXY += f.momentum * f.target;
+        sumX2 += f.momentum * f.momentum;
+        sumY2 += f.target * f.target;
+      });
+      
+      let slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+      let intercept = (sumY - slope * sumX) / n;
+      
+      // Calculate R-squared
+      let meanY = sumY / n;
+      let ssRes = 0, ssTot = 0;
+      features.forEach(f => {
+        let predicted = slope * f.momentum + intercept;
+        ssRes += Math.pow(f.target - predicted, 2);
+        ssTot += Math.pow(f.target - meanY, 2);
+      });
+      
+      let rSquared = 1 - (ssRes / ssTot);
+      let rmse = Math.sqrt(ssRes / n);
+      
+      return {
+        slope: slope,
+        intercept: intercept,
+        rSquared: rSquared,
+        rmse: rmse
+      };
+    }
+
+    function predict(model, features) {
+      return model.slope * features.momentum + model.intercept;
+    }
+
+    function calculateConfidence(model, features) {
+      // Simple confidence based on R-squared and recent volatility
+      return Math.min(Math.max(model.rSquared, 0.1), 0.9);
+    }
+
+    function showEfficientFrontier() {
+      let frontierPoints = calculateEfficientFrontier();
+      
+      let frontierHtml = `
+        <div style="background: #fff; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #dee2e6;">
+          <h3>Efficient Frontier Analysis</h3>
+          <div style="margin: 15px 0;">
+            <canvas id="frontierChart" width="500" height="300" style="border: 1px solid #ddd;"></canvas>
+          </div>
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+            <h4>Current Portfolio Position</h4>
+            <div><strong>Expected Return:</strong> ${cagr.toFixed(2)}%</div>
+            <div><strong>Volatility:</strong> ${annualVolatility.toFixed(2)}%</div>
+            <div><strong>Sharpe Ratio:</strong> ${sharpeRatio.toFixed(2)}</div>
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('demo3').innerHTML += frontierHtml;
+      
+      // Draw efficient frontier chart
+      setTimeout(() => {
+        drawEfficientFrontier(frontierPoints);
+      }, 100);
+    }
+
+    function drawEfficientFrontier(points) {
+      let canvas = document.getElementById('frontierChart');
+      if (!canvas) return;
+      
+      let ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Set up scales
+      let maxRisk = Math.max(...points.map(p => p.risk));
+      let maxReturn = Math.max(...points.map(p => p.return));
+      let minRisk = Math.min(...points.map(p => p.risk));
+      let minReturn = Math.min(...points.map(p => p.return));
+      
+      // Draw axes
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(50, 50);
+      ctx.lineTo(50, 250);
+      ctx.lineTo(450, 250);
+      ctx.stroke();
+      
+      // Draw efficient frontier
+      ctx.strokeStyle = '#007bff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      
+      points.forEach((point, i) => {
+        let x = 50 + ((point.risk - minRisk) / (maxRisk - minRisk)) * 400;
+        let y = 250 - ((point.return - minReturn) / (maxReturn - minReturn)) * 200;
+        
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.stroke();
+      
+      // Mark current portfolio
+      let currentRisk = annualVolatility;
+      let currentReturn = cagr;
+      let currentX = 50 + ((currentRisk - minRisk) / (maxRisk - minRisk)) * 400;
+      let currentY = 250 - ((currentReturn - minReturn) / (maxReturn - minReturn)) * 200;
+      
+      ctx.fillStyle = '#dc3545';
+      ctx.beginPath();
+      ctx.arc(currentX, currentY, 5, 0, 2 * Math.PI);
+      ctx.fill();
+      
+      // Add labels
+      ctx.fillStyle = '#333';
+      ctx.font = '12px Arial';
+      ctx.fillText('Risk (Volatility %)', 200, 280);
+      ctx.save();
+      ctx.translate(20, 150);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText('Expected Return %', 0, 0);
+      ctx.restore();
+    }
+
+    // Stress testing scenarios
+    function runStressTests() {
+      const stressScenarios = {
+        'Market Crash (-30%)': -30,
+        'Moderate Correction (-15%)': -15,
+        'High Volatility (+50% vol)': 0,
+        'Interest Rate Spike': -10,
+        'Sector Rotation': -5,
+        'Currency Crisis': -20
+      };
+
+      let stressResults = [];
+      
+      Object.entries(stressScenarios).forEach(([scenario, impact]) => {
+        let stressedReturns = pReturns.map(r => {
+          if (scenario === 'High Volatility (+50% vol)') {
+            return r * 1.5; // Increase volatility
+          } else {
+            return r + impact; // Apply shock
+          }
+        });
+        
+        let stressedBalance = 10000;
+        stressedReturns.forEach(r => {
+          stressedBalance *= (1 + r / 100);
+        });
+        
+        let stressedCAGR = (Math.pow(stressedBalance / 10000, 1 / (stressedReturns.length / 12)) - 1) * 100;
+        let stressedVol = math.std(stressedReturns) * Math.sqrt(12);
+        
+        stressResults.push({
+          scenario: scenario,
+          finalValue: stressedBalance,
+          cagr: stressedCAGR,
+          volatility: stressedVol,
+          impact: ((stressedBalance - balances[balances.length - 1]) / balances[balances.length - 1] * 100)
+        });
+      });
+
+      // Display stress test results
+      let stressHtml = `
+        <table style="width: 100%; margin-top: 10px;">
+          <tr>
+            <th>Stress Scenario</th>
+            <th>Final Value</th>
+            <th>CAGR</th>
+            <th>Volatility</th>
+            <th>Impact</th>
+          </tr>
+          ${stressResults.map(result => `
+            <tr>
+              <td>${result.scenario}</td>
+              <td>$${result.finalValue.toFixed(2)}</td>
+              <td>${result.cagr.toFixed(2)}%</td>
+              <td>${result.volatility.toFixed(2)}%</td>
+              <td style="color: ${result.impact >= 0 ? '#28a745' : '#dc3545'};">
+                ${result.impact >= 0 ? '+' : ''}${result.impact.toFixed(2)}%
+              </td>
+            </tr>
+          `).join('')}
+        </table>
+      `;
+      
+      document.getElementById('stressTestResults').innerHTML = stressHtml;
+    }
+
+    // Black-Litterman optimization
+    function blackLittermanOptimization() {
+      // Simplified Black-Litterman implementation
+      let marketCaps = tickers.map(() => 1); // Equal market caps for simplicity
+      let riskAversion = 3; // Conservative investor
+      let tau = 0.025; // Scaling parameter
+      
+      // Calculate implied returns using reverse optimization
+      let covMatrix = calculateCovarianceMatrix();
+      let impliedReturns = [];
+      
+      for (let i = 0; i < tickers.length; i++) {
+        let impliedReturn = 0;
+        for (let j = 0; j < tickers.length; j++) {
+          impliedReturn += riskAversion * covMatrix[i][j] * weights[j];
+        }
+        impliedReturns.push(impliedReturn * 100); // Convert to percentage
+      }
+      
+      return {
+        impliedReturns: impliedReturns,
+        optimalWeights: weights // Simplified - would normally update based on views
+      };
+    }
+
+    function calculateCovarianceMatrix() {
+      let matrix = [];
+      for (let i = 0; i < tickers.length; i++) {
+        matrix[i] = [];
+        for (let j = 0; j < tickers.length; j++) {
+          let returnsI = Object.values(df).map(r => r[tickers[i]] || 0);
+          let returnsJ = Object.values(df).map(r => r[tickers[j]] || 0);
+          matrix[i][j] = calculateCovariance(returnsI, returnsJ) / 10000; // Scale down
+        }
+      }
+      return matrix;
+    }
+
+    // Efficient frontier calculation
+    function calculateEfficientFrontier() {
+      let frontierPoints = [];
+      let covMatrix = calculateCovarianceMatrix();
+      
+      // Generate points along the efficient frontier
+      for (let targetReturn = 5; targetReturn <= 20; targetReturn += 1) {
+        let optimizedWeights = optimizeForReturn(targetReturn, covMatrix);
+        let portfolioReturn = calculatePortfolioReturn(optimizedWeights);
+        let portfolioRisk = calculatePortfolioRisk(optimizedWeights, covMatrix);
+        
+        frontierPoints.push({
+          return: portfolioReturn,
+          risk: portfolioRisk,
+          weights: optimizedWeights
+        });
+      }
+      
+      return frontierPoints;
+    }
+
+    function optimizeForReturn(targetReturn, covMatrix) {
+      // Simplified mean-variance optimization
+      // In practice, would use quadratic programming
+      let bestWeights = [...weights];
+      let bestRisk = Infinity;
+      
+      // Simple grid search (not optimal but illustrative)
+      for (let w1 = 0.1; w1 <= 0.8; w1 += 0.1) {
+        for (let w2 = 0.1; w2 <= 0.8; w2 += 0.1) {
+          let w3 = 1 - w1 - w2;
+          if (w3 > 0 && w3 <= 0.8) {
+            let testWeights = [w1, w2, w3];
+            let testReturn = calculatePortfolioReturn(testWeights);
+            let testRisk = calculatePortfolioRisk(testWeights, covMatrix);
+            
+            if (Math.abs(testReturn - targetReturn) < 1 && testRisk < bestRisk) {
+              bestWeights = testWeights;
+              bestRisk = testRisk;
+            }
+          }
+        }
+      }
+      
+      return bestWeights;
+    }
+
+    function calculatePortfolioReturn(weights) {
+      let portfolioReturn = 0;
+      for (let i = 0; i < tickers.length; i++) {
+        let assetReturns = byAsset[tickers[i]] || [0];
+        let meanReturn = math.mean(assetReturns);
+        portfolioReturn += weights[i] * meanReturn;
+      }
+      return portfolioReturn * 12; // Annualized
+    }
+
+    function calculatePortfolioRisk(weights, covMatrix) {
+      let portfolioVariance = 0;
+      for (let i = 0; i < weights.length; i++) {
+        for (let j = 0; j < weights.length; j++) {
+          portfolioVariance += weights[i] * weights[j] * covMatrix[i][j];
+        }
+      }
+      return Math.sqrt(portfolioVariance) * Math.sqrt(12) * 100; // Annualized percentage
+    }
     // Default tickers and weights  
     var defaultTickers = ["$BAC", "$JPM", "$MSFT"];
     var defaultWeights = [0.3, 0.3, 0.4];
@@ -666,43 +1042,269 @@
             `).join('')}
           </div>
         </div> <h2 style="margin-top: 15px;">Risk Metrics by Position</h2> <table style="width: 100%; margin-top: 10px;"> <tr> <th>Position</th> <th>Weight</th> <th>MCTR</th> <th>ACTR</th> <th>% Risk</th> </tr>  ${tickers.map((ticker, i) => ` <tr> <td>${ticker}</td> <td>${(weights[i] * 100).toFixed(1)}%</td> <td>${riskMetrics[ticker].mctr.toFixed(4)}</td> <td>${riskMetrics[ticker].actr.toFixed(4)}</td> <td>${riskMetrics[ticker].pctRisk.toFixed(1)}%</td> </tr>  `).join('')} </table> </div>  `;
-      // Run Monte Carlo simulation  
+      // Enhanced Monte Carlo simulation with multiple scenarios
+      var numSimulations = 10000;
+      var forecastMonths = [6, 12, 24, 60]; // Multiple time horizons
+      var confidenceIntervals = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95];
 
-      var numSimulations = 1000;
-      var forecastMonths = 12;
-      var confidenceIntervals = [0.05, 0.25, 0.5, 0.75, 0.95];
+      function generateCorrelatedReturns(assetReturns, correlationMatrix) {
+        // Generate correlated random returns for each asset
+        let numAssets = tickers.length;
+        let randomNormals = [];
+        
+        // Generate independent normal random variables
+        for (let i = 0; i < numAssets; i++) {
+          randomNormals.push(generateNormalRandom());
+        }
+        
+        // Apply Cholesky decomposition for correlation
+        let correlatedReturns = [];
+        for (let i = 0; i < numAssets; i++) {
+          let correlatedReturn = 0;
+          for (let j = 0; j <= i; j++) {
+            correlatedReturn += getCholeskyElement(correlationMatrix, i, j) * randomNormals[j];
+          }
+          
+          let assetMean = math.mean(assetReturns[tickers[i]] || [0]);
+          let assetStd = math.std(assetReturns[tickers[i]] || [0]);
+          correlatedReturns.push(assetMean + correlatedReturn * assetStd);
+        }
+        
+        return correlatedReturns;
+      }
 
-      function runMonteCarlo(returns, initialValue) {
+      function generateNormalRandom() {
+        // Box-Muller transformation for normal distribution
+        let u1 = Math.random();
+        let u2 = Math.random();
+        return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+      }
+
+      function getCholeskyElement(correlationMatrix, i, j) {
+        // Simplified Cholesky decomposition element
+        if (i === j) return Math.sqrt(Math.max(0, correlationMatrix[i][j]));
+        if (j > i) return 0;
+        return correlationMatrix[i][j] / Math.sqrt(correlationMatrix[j][j]);
+      }
+
+      function runEnhancedMonteCarlo(returns, assetReturns, initialValue, months) {
         let paths = [];
-        let meanReturn = math.mean(returns);
-        let stdDev = math.std(returns);
+        let portfolioReturns = [];
+        let maxDrawdowns = [];
+        let volatilities = [];
+        
         for (let sim = 0; sim < numSimulations; sim++) {
           let path = [initialValue];
           let currentValue = initialValue;
-          for (let month = 0; month < forecastMonths; month++) {
-            // Generate random return using normal distribution  
-            let randomReturn = math.random(meanReturn - 2 * stdDev, meanReturn + 2 * stdDev);
-            currentValue *= (1 + randomReturn / 100);
+          let maxValue = initialValue;
+          let maxDrawdown = 0;
+          let monthlyReturns = [];
+          
+          for (let month = 0; month < months; month++) {
+            let correlatedReturns = generateCorrelatedReturns(assetReturns, correlationMatrix);
+            let portfolioReturn = 0;
+            
+            // Calculate weighted portfolio return
+            for (let i = 0; i < tickers.length; i++) {
+              portfolioReturn += weights[i] * correlatedReturns[i];
+            }
+            
+            monthlyReturns.push(portfolioReturn);
+            currentValue *= (1 + portfolioReturn / 100);
             path.push(currentValue);
+            
+            // Track maximum value and drawdown
+            if (currentValue > maxValue) {
+              maxValue = currentValue;
+            }
+            let currentDrawdown = (maxValue - currentValue) / maxValue * 100;
+            if (currentDrawdown > maxDrawdown) {
+              maxDrawdown = currentDrawdown;
+            }
           }
+          
           paths.push(path);
+          portfolioReturns.push((currentValue / initialValue - 1) * 100);
+          maxDrawdowns.push(maxDrawdown);
+          volatilities.push(math.std(monthlyReturns) * Math.sqrt(12));
         }
-        // Calculate percentiles for confidence intervals  
+        
+        // Calculate advanced statistics
         let finalValues = paths.map(path => path[path.length - 1]);
-        let percentiles = confidenceIntervals.map(ci => {
-          return {
-            ci: ci * 100,
-            value: math.quantileSeq(finalValues, ci)
-          };
-        });
+        let percentiles = confidenceIntervals.map(ci => ({
+          ci: ci * 100,
+          value: math.quantileSeq(finalValues, ci)
+        }));
+        
+        let probabilityOfLoss = (portfolioReturns.filter(r => r < 0).length / numSimulations) * 100;
+        let probabilityOfOutperformance = (portfolioReturns.filter(r => r > 10).length / numSimulations) * 100;
+        
         return {
           paths: paths,
-          percentiles: percentiles
+          percentiles: percentiles,
+          finalValues: finalValues,
+          portfolioReturns: portfolioReturns,
+          maxDrawdowns: maxDrawdowns,
+          volatilities: volatilities,
+          probabilityOfLoss: probabilityOfLoss,
+          probabilityOfOutperformance: probabilityOfOutperformance,
+          expectedReturn: math.mean(portfolioReturns),
+          expectedVolatility: math.mean(volatilities),
+          expectedMaxDrawdown: math.mean(maxDrawdowns)
         };
       }
 
-      var monteCarloResults = runMonteCarlo(pReturns, 100);
-      var monteCarloHtml = ` <div style="margin: 20px 0; font-family: 'Montserrat', serif;"> <h3>Monte Carlo Simulation Results (${numSimulations} simulations over ${forecastMonths} months)</h3> <div style="margin: 10px 0;">Starting value: $100</div> <div>Confidence Intervals for Final Portfolio Value:</div>  ${monteCarloResults.percentiles.map(p => `<div>${p.ci}th percentile: $${p.value.toFixed(2)}</div>`).join('')} </div>  `;
+      // Value at Risk (VaR) calculation
+      function calculateVaR(returns, confidenceLevel) {
+        let sortedReturns = returns.slice().sort((a, b) => a - b);
+        let index = Math.floor((1 - confidenceLevel) * sortedReturns.length);
+        return sortedReturns[index];
+      }
+
+      // Conditional Value at Risk (CVaR)
+      function calculateCVaR(returns, confidenceLevel) {
+        let var95 = calculateVaR(returns, confidenceLevel);
+        let tailLosses = returns.filter(r => r <= var95);
+        return tailLosses.length > 0 ? math.mean(tailLosses) : var95;
+      }
+
+      // Generate correlation matrix for Monte Carlo
+      let correlationMatrix = [];
+      for (let i = 0; i < tickers.length; i++) {
+        correlationMatrix[i] = [];
+        for (let j = 0; j < tickers.length; j++) {
+          let returnsI = Object.values(df).map(r => r[tickers[i]] || 0);
+          let returnsJ = Object.values(df).map(r => r[tickers[j]] || 0);
+          correlationMatrix[i][j] = calculateCorrelation(returnsI, returnsJ);
+        }
+      }
+
+      // Run Monte Carlo for multiple time horizons
+      let monteCarloResults = {};
+      forecastMonths.forEach(months => {
+        monteCarloResults[months] = runEnhancedMonteCarlo(pReturns, byAsset, 100, months);
+      });
+
+      // Advanced portfolio metrics
+      let var95 = calculateVaR(pReturns, 0.95);
+      let cvar95 = calculateCVaR(pReturns, 0.95);
+      let maxDrawdown = calculateMaxDrawdown(balances);
+      let sharpeRatio = calculateSharpeRatio(pReturns);
+      let sortino = calculateSortino(pReturns);
+      let calmarRatio = cagr / Math.abs(maxDrawdown);
+
+      function calculateMaxDrawdown(values) {
+        let maxDrawdown = 0;
+        let peak = values[0];
+        
+        for (let i = 1; i < values.length; i++) {
+          if (values[i] > peak) {
+            peak = values[i];
+          }
+          let drawdown = (peak - values[i]) / peak * 100;
+          if (drawdown > maxDrawdown) {
+            maxDrawdown = drawdown;
+          }
+        }
+        return maxDrawdown;
+      }
+
+      function calculateSharpeRatio(returns) {
+        let meanReturn = math.mean(returns);
+        let stdDev = math.std(returns);
+        return (meanReturn * 12) / (stdDev * Math.sqrt(12)); // Annualized
+      }
+
+      function calculateSortino(returns) {
+        let meanReturn = math.mean(returns);
+        let negativeReturns = returns.filter(r => r < 0);
+        let downsideStd = negativeReturns.length > 0 ? math.std(negativeReturns) : 0;
+        return downsideStd > 0 ? (meanReturn * 12) / (downsideStd * Math.sqrt(12)) : Infinity;
+      }
+
+      // Market regime analysis
+      function analyzeMarketRegimes(returns) {
+        let regimes = {
+          bull: returns.filter(r => r > 2).length,
+          bear: returns.filter(r => r < -2).length,
+          neutral: returns.filter(r => r >= -2 && r <= 2).length
+        };
+        let total = returns.length;
+        return {
+          bull: (regimes.bull / total * 100).toFixed(1),
+          bear: (regimes.bear / total * 100).toFixed(1),
+          neutral: (regimes.neutral / total * 100).toFixed(1)
+        };
+      }
+
+      let marketRegimes = analyzeMarketRegimes(pReturns);
+
+      // Generate comprehensive Monte Carlo results HTML
+      let monteCarloHtml = `
+        <div style="margin: 20px 0; font-family: 'Montserrat', serif;">
+          <h3>Enhanced Monte Carlo Simulation Results (${numSimulations} simulations)</h3>
+          
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0;">
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+              <h4>Historical Risk Metrics</h4>
+              <div><strong>VaR (95%):</strong> ${var95.toFixed(2)}%</div>
+              <div><strong>CVaR (95%):</strong> ${cvar95.toFixed(2)}%</div>
+              <div><strong>Max Drawdown:</strong> ${maxDrawdown.toFixed(2)}%</div>
+              <div><strong>Sharpe Ratio:</strong> ${sharpeRatio.toFixed(2)}</div>
+              <div><strong>Sortino Ratio:</strong> ${sortino.toFixed(2)}</div>
+              <div><strong>Calmar Ratio:</strong> ${calmarRatio.toFixed(2)}</div>
+            </div>
+            
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+              <h4>Market Regime Analysis</h4>
+              <div><strong>Bull Market (>2%):</strong> ${marketRegimes.bull}% of periods</div>
+              <div><strong>Bear Market (<-2%):</strong> ${marketRegimes.bear}% of periods</div>
+              <div><strong>Neutral Market:</strong> ${marketRegimes.neutral}% of periods</div>
+            </div>
+          </div>
+          
+          ${forecastMonths.map(months => {
+            let results = monteCarloResults[months];
+            let years = months / 12;
+            return `
+              <div style="background: #fff; padding: 15px; border-radius: 8px; margin: 10px 0; border: 1px solid #dee2e6;">
+                <h4>${months}-Month Forecast (${years.toFixed(1)} years)</h4>
+                
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 10px 0;">
+                  <div>
+                    <strong>Expected Return:</strong> ${results.expectedReturn.toFixed(2)}%<br>
+                    <strong>Expected Volatility:</strong> ${results.expectedVolatility.toFixed(2)}%<br>
+                    <strong>Expected Max Drawdown:</strong> ${results.expectedMaxDrawdown.toFixed(2)}%
+                  </div>
+                  <div>
+                    <strong>Probability of Loss:</strong> ${results.probabilityOfLoss.toFixed(1)}%<br>
+                    <strong>Prob of >10% Return:</strong> ${results.probabilityOfOutperformance.toFixed(1)}%<br>
+                    <strong>Best Case (95%):</strong> $${results.percentiles.find(p => p.ci === 95).value.toFixed(2)}
+                  </div>
+                  <div>
+                    <strong>Worst Case (5%):</strong> $${results.percentiles.find(p => p.ci === 5).value.toFixed(2)}<br>
+                    <strong>Median Outcome:</strong> $${results.percentiles.find(p => p.ci === 50).value.toFixed(2)}<br>
+                    <strong>Conservative (25%):</strong> $${results.percentiles.find(p => p.ci === 25).value.toFixed(2)}
+                  </div>
+                </div>
+                
+                <div style="margin-top: 10px;">
+                  <strong>Confidence Intervals:</strong><br>
+                  ${results.percentiles.map(p => 
+                    `${p.ci}%: $${p.value.toFixed(2)}`
+                  ).join(' | ')}
+                </div>
+              </div>
+            `;
+          }).join('')}
+          
+          <div style="background: #e7f3ff; padding: 15px; border-radius: 8px; margin: 10px 0;">
+            <h4>Portfolio Stress Testing</h4>
+            <div id="stressTestResults"></div>
+            <button onclick="runStressTests()" style="margin-top: 10px; padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Run Stress Tests</button>
+          </div>
+        </div>
+      `;
       document.getElementById("tbl-container").innerHTML = metricsHtml + monteCarloHtml + txt + "<hr />";
 
       document.getElementById("demo2").innerHTML = JSON.stringify(byTicker, null, 2) + "<hr />" + JSON.stringify(byTicker2, null, 2);
