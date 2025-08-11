@@ -108,9 +108,28 @@
 
         .table-container {
             height: 500px;
-            overflow-y: auto;
             border: 1px solid #e0e0e0;
             position: relative;
+            overflow: hidden;
+        }
+
+        .virtual-scroll-wrapper {
+            height: 460px; /* Container height minus header */
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .virtual-scroll-spacer {
+            width: 1px;
+            pointer-events: none;
+        }
+
+        .virtual-scroll-content {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            will-change: transform;
         }
 
         .table-header {
@@ -269,7 +288,7 @@
         }
 
         /**
-         * Render the data table
+         * Render the data table with virtual scrolling
          */
         function renderTable(data) {
             const container = document.getElementById('tableContainer');
@@ -285,6 +304,7 @@
             
             const headers = Object.keys(data[0]);
 
+            // Create virtual scroll structure
             container.innerHTML = `
                 <div class="table-header">
                     ${headers.map((header, index) => `
@@ -294,19 +314,92 @@
                         </div>
                     `).join('')}
                 </div>
-                <div class="table-body">
-                    ${data.map(row => `
-                        <div class="table-row">
-                            ${headers.map(header => `
-                                <div class="table-cell ${getColumnAlignment(header)} ${getColumnWidth(header)}">
-                                    ${formatCellValue(row[header])}
-                                </div>
-                            `).join('')}
-                        </div>
-                    `).join('')}
+                <div class="virtual-scroll-wrapper">
+                    <div class="virtual-scroll-spacer"></div>
+                    <div class="virtual-scroll-content"></div>
                 </div>
             `;
+
+            // Initialize virtual scrolling
+            virtualScrollInstance = new VirtualScroll(container, data, headers);
         }
+
+        /**
+         * Virtual Scroll Implementation
+         */
+        class VirtualScroll {
+            constructor(container, data, headers) {
+                this.container = container;
+                this.data = data;
+                this.headers = headers;
+                this.rowHeight = 40; // Height of each row in pixels
+                this.visibleRows = Math.ceil(460 / this.rowHeight); // Container height / row height
+                this.startIndex = 0;
+                this.endIndex = Math.min(this.visibleRows, this.data.length);
+                
+                this.scrollWrapper = container.querySelector('.virtual-scroll-wrapper');
+                this.spacer = container.querySelector('.virtual-scroll-spacer');
+                this.content = container.querySelector('.virtual-scroll-content');
+                
+                this.init();
+            }
+
+            init() {
+                // Set total height for proper scrollbar
+                const totalHeight = this.data.length * this.rowHeight;
+                this.spacer.style.height = `${totalHeight}px`;
+                
+                // Add scroll event listener
+                this.scrollWrapper.addEventListener('scroll', this.handleScroll.bind(this));
+                
+                // Initial render
+                this.renderVisibleRows();
+            }
+
+            handleScroll() {
+                const scrollTop = this.scrollWrapper.scrollTop;
+                const newStartIndex = Math.floor(scrollTop / this.rowHeight);
+                const newEndIndex = Math.min(newStartIndex + this.visibleRows + 5, this.data.length); // +5 for buffer
+                
+                if (newStartIndex !== this.startIndex || newEndIndex !== this.endIndex) {
+                    this.startIndex = newStartIndex;
+                    this.endIndex = newEndIndex;
+                    this.renderVisibleRows();
+                }
+            }
+
+            renderVisibleRows() {
+                const visibleData = this.data.slice(this.startIndex, this.endIndex);
+                const offsetY = this.startIndex * this.rowHeight;
+                
+                this.content.style.transform = `translateY(${offsetY}px)`;
+                this.content.innerHTML = visibleData.map(row => `
+                    <div class="table-row">
+                        ${this.headers.map(header => `
+                            <div class="table-cell ${getColumnAlignment(header)} ${getColumnWidth(header)}">
+                                ${formatCellValue(row[header])}
+                            </div>
+                        `).join('')}
+                    </div>
+                `).join('');
+            }
+
+            // Method to update data (for sorting)
+            updateData(newData) {
+                this.data = newData;
+                this.startIndex = 0;
+                this.endIndex = Math.min(this.visibleRows, this.data.length);
+                
+                const totalHeight = this.data.length * this.rowHeight;
+                this.spacer.style.height = `${totalHeight}px`;
+                this.scrollWrapper.scrollTop = 0;
+                
+                this.renderVisibleRows();
+            }
+        }
+
+        // Global variable to store virtual scroll instance
+        let virtualScrollInstance = null;
 
         /**
          * Sort the table by column
@@ -345,7 +438,12 @@
                 }
             });
 
-            renderTable(sortedData);
+            // Update virtual scroll with sorted data
+            if (virtualScrollInstance) {
+                virtualScrollInstance.updateData(sortedData);
+            } else {
+                renderTable(sortedData);
+            }
         }
 
         /**
