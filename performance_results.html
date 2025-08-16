@@ -25,33 +25,28 @@
   <div class="content">
     <h1>Performance Query Results</h1>
 
-    <div class="controls-container" style="margin-bottom: 20px;">
-    <div class="controls-grid">
-      <div class="control-group">
-        <label for="accountSelect" class="control-label">Select Account:</label>
-        <select id="accountSelect" class="control-input">
-          <option value="">Loading accounts...</option>
-        </select>
-      </div>
+    <div class="accounts-container" style="margin-bottom: 20px;">
+      <h2 style="margin-bottom: 15px; color: #333;">Select an Account to View Performance</h2>
+      
+      <div class="date-controls" style="margin-bottom: 20px; display: flex; gap: 20px; align-items: center;">
+        <div class="control-group">
+          <label for="startDate" class="control-label">Start Date:</label>
+          <div class="date-input-group">
+            <input type="date" id="startDate" class="control-input date-input" value="2023-01-01">
+            <button id="inceptionBtn" type="button" class="inception-btn">Use Inception Date</button>
+          </div>
+        </div>
 
-      <div class="control-group">
-        <label for="startDate" class="control-label">Start Date:</label>
-        <div class="date-input-group">
-          <input type="date" id="startDate" class="control-input date-input" value="2023-01-01">
-          <button id="inceptionBtn" type="button" class="inception-btn">Use Inception Date</button>
+        <div class="control-group">
+          <label for="endDate" class="control-label">End Date:</label>
+          <input type="date" id="endDate" class="control-input">
         </div>
       </div>
 
-      <div class="control-group">
-        <label for="endDate" class="control-label">End Date:</label>
-        <input type="date" id="endDate" class="control-input">
-      </div>
-
-      <div class="control-group load-btn-group">
-        <button id="loadDataBtn" class="load-data-btn">Load Performance Data</button>
+      <div id="accountsTable" class="accounts-table" style="background: white; border-radius: var(--border-radius); padding: var(--space-4); box-shadow: var(--shadow-sm); border: 1px solid var(--gray-200);">
+        <div class="loading" style="text-align: center; padding: 20px; color: #666;">Loading accounts...</div>
       </div>
     </div>
-  </div>
 
   <div id="loading" class="loading" style="display: none;">Loading data...</div>
   <div id="error" class="error" style="display: none;"></div>
@@ -171,7 +166,9 @@
             cell.style.color = '#007bff';
             cell.style.textDecoration = 'underline';
             cell.addEventListener('click', () => {
-              showHoldingsModal(cellValue, document.getElementById('accountSelect').value);
+              // Get account number from the currently loaded data context
+              const currentAccount = window.currentAccount || 'Unknown';
+              showHoldingsModal(cellValue, currentAccount);
             });
           }
 
@@ -443,9 +440,6 @@
     // Load accounts on page load
     loadAccounts();
 
-    // Add event listener for load data button
-    document.getElementById('loadDataBtn').addEventListener('click', loadPerformanceData);
-
     // Add event listener for inception date button
     document.getElementById('inceptionBtn').addEventListener('click', loadInceptionDate);
 
@@ -458,36 +452,91 @@
           return response.json();
         })
         .then(accounts => {
-          const select = document.getElementById('accountSelect');
-          select.innerHTML = '<option value="">Select an account...</option>';
-
-          accounts.forEach(account => {
-            const option = document.createElement('option');
-            option.value = account.acct_num;
-            option.textContent = account.acct_num;
-            select.appendChild(option);
-          });
+          displayAccountsTable(accounts);
         })
         .catch(error => {
           console.error('Error loading accounts:', error);
-          document.getElementById('accountSelect').innerHTML = '<option value="">Error loading accounts</option>';
+          document.getElementById('accountsTable').innerHTML = '<div class="error" style="text-align: center; padding: 20px; color: #d32f2f;">Error loading accounts</div>';
         });
     }
 
-    function loadInceptionDate() {
-      const selectedAccount = document.getElementById('accountSelect').value;
-
-      if (!selectedAccount) {
-        alert('Please select an account first');
+    function displayAccountsTable(accounts) {
+      const container = document.getElementById('accountsTable');
+      
+      if (!accounts || accounts.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">No accounts found</div>';
         return;
       }
 
+      // Create table HTML
+      let tableHtml = `
+        <table style="width: 100%; border-collapse: collapse; font-family: 'Inter', sans-serif;">
+          <thead>
+            <tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+              <th style="padding: 15px; text-align: left; border: 1px solid #dee2e6; font-weight: 600; font-size: 16px;">Account Number</th>
+              <th style="padding: 15px; text-align: center; border: 1px solid #dee2e6; font-weight: 600; font-size: 16px;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      accounts.forEach(account => {
+        tableHtml += `
+          <tr class="account-row" data-account="${account.acct_num}" style="cursor: pointer; transition: background-color 0.2s;">
+            <td style="padding: 15px; border: 1px solid #dee2e6; font-size: 16px; font-weight: 500;">${account.acct_num}</td>
+            <td style="padding: 15px; border: 1px solid #dee2e6; text-align: center;">
+              <button class="view-performance-btn" data-account="${account.acct_num}" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500;">
+                View Performance
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+
+      tableHtml += `
+          </tbody>
+        </table>
+      `;
+
+      container.innerHTML = tableHtml;
+
+      // Add click event listeners to rows and buttons
+      document.querySelectorAll('.account-row').forEach(row => {
+        row.addEventListener('mouseenter', function() {
+          this.style.backgroundColor = '#f8f9fa';
+        });
+        
+        row.addEventListener('mouseleave', function() {
+          this.style.backgroundColor = '';
+        });
+
+        row.addEventListener('click', function() {
+          const accountNum = this.dataset.account;
+          loadPerformanceData(accountNum);
+        });
+      });
+
+      // Add click event listeners to buttons (prevent event bubbling)
+      document.querySelectorAll('.view-performance-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const accountNum = this.dataset.account;
+          loadPerformanceData(accountNum);
+        });
+      });
+    }
+
+    function loadInceptionDate() {
+      alert('Please select an account first to load its inception date');
+    }
+
+    function loadInceptionDateForAccount(accountNum) {
       const inceptionBtn = document.getElementById('inceptionBtn');
       const originalText = inceptionBtn.textContent;
       inceptionBtn.textContent = 'Loading...';
       inceptionBtn.disabled = true;
 
-      fetch(`get_inception_date.php?acct_num=${selectedAccount}`)
+      fetch(`get_inception_date.php?acct_num=${accountNum}`)
         .then(response => {
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -511,15 +560,17 @@
         });
     }
 
-    function loadPerformanceData() {
-      const selectedAccount = document.getElementById('accountSelect').value;
+    function loadPerformanceData(accountNum) {
       const startDate = document.getElementById('startDate').value;
       const endDate = document.getElementById('endDate').value;
 
-      if (!selectedAccount) {
+      if (!accountNum) {
         showError('Please select an account first');
         return;
       }
+
+      // Load inception date for selected account
+      loadInceptionDateForAccount(accountNum);
 
       // Clear previous data
       document.querySelector('.tbl-container').style.display = 'none';
@@ -527,8 +578,11 @@
       document.getElementById('error').style.display = 'none';
       document.getElementById('loading').style.display = 'block';
 
+      // Scroll to loading indicator
+      document.getElementById('loading').scrollIntoView({ behavior: 'smooth' });
+
       // Build URL with date parameters
-      let url = `performance_query.php?acct_num=${selectedAccount}`;
+      let url = `performance_query.php?acct_num=${accountNum}`;
       if (startDate) {
         url += `&start_date=${startDate}`;
       }
@@ -546,6 +600,9 @@
         })
         .then(data => {
           document.getElementById('loading').style.display = 'none';
+          
+          // Store current account for use in date cell clicks
+          window.currentAccount = accountNum;
 
           if (data && data.length > 0) {
             // Create and show chart
@@ -565,7 +622,7 @@
 
             new VirtualScroll(container, data);
           } else {
-            showError('No data found for selected account');
+            showError('No data found for account ' + accountNum);
           }
         })
         .catch(error => {
@@ -584,7 +641,7 @@
 
       // Show modal and reset state
       modal.style.display = 'block';
-      modalTitle.textContent = `Holdings as of ${date}`;
+      modalTitle.textContent = `Holdings as of ${date} (Account: ${accountNum})`;
       holdingsLoading.style.display = 'block';
       holdingsError.style.display = 'none';
       holdingsTable.style.display = 'none';
