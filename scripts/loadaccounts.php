@@ -9,7 +9,7 @@ if (!$con) {
 }
 
 // Load all accounts without user filtering
-$query = "SELECT DISTINCT acct_num FROM transactions_trig ORDER BY acct_num";
+$query = "SELECT DISTINCT acct_num FROM transactions_temp ORDER BY acct_num";
 $result = pg_query($con, $query);
 
 $accounts = array();

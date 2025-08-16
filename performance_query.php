@@ -5,7 +5,7 @@ $con = pg_connect($conn_string);
 
 // Get acct_num from query parameter
 $acct_num = $_GET['acct_num'];
-$acct_num = 800;
+//$acct_num = 800;
 
 $sql = "WITH tr AS ( 
     SELECT * FROM transactions_temp WHERE acct_num = ".$acct_num."
@@ -54,7 +54,8 @@ GROUP BY mktvalues.date, total_cf, contr_distr
 ORDER BY mktvalues.date
 )
 SELECT date, dailyval, total_cf, cash_balance, (dailyval + cash_balance) AS total_market_value, external_cf,
-( (dailyval + cash_balance) / ( LAG(dailyval, 1) OVER (ORDER BY date) + LAG(cash_balance, 1) OVER (ORDER BY date) + external_cf) ) AS pct_return
+( (dailyval + cash_balance) / ( LAG(dailyval, 1) OVER (ORDER BY date) + LAG(cash_balance, 1) OVER (ORDER BY date) + external_cf) ) AS factor,
+( (dailyval + cash_balance) / ( LAG(dailyval, 1) OVER (ORDER BY date) + LAG(cash_balance, 1) OVER (ORDER BY date) + external_cf) ) -1 AS pct_return
 FROM twr
 ";
 
