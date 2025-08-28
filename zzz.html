@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Analytics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjs@14.6.0/lib/browser/math.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-blue: #2563eb;
+            --primary-dark: #1d4ed8;
+            --success-green: #10b981;
+            --danger-red: #ef4444;
+            --warning-orange: #f59e0b;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-600: #4b5563;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--gray-800);
+        }
+
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .controls-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .control-row {
+            display: flex;
+            gap: 1rem;
+            align-items: end;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            min-width: 200px;
+        }
+
+        .control-label {
+            font-weight: 600;
+            color: var(--gray-700);
+            font-size: 0.9rem;
+        }
+
+        .control-input {
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--gray-200);
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .control-input:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--primary-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        .btn-secondary {
+            background: var(--gray-100);
+            color: var(--gray-700);
+            border: 1px solid var(--gray-300);
+        }
+
+        .btn-secondary:hover {
+            background: var(--gray-200);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--gray-100);
+            transition: transform 0.2s;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .metric-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .metric-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--gray-600);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-change {
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .positive { color: var(--success-green); }
+        .negative { color: var(--danger-red); }
+        .neutral { color: var(--gray-600); }
+
+        .chart-container {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--gray-100);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .chart-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--gray-800);
+        }
+
+        .chart-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .tab-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--gray-300);
+            background: white;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background: var(--primary-blue);
+            color: white;
+            border-color: var(--primary-blue);
+        }
+
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .analysis-panel {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--gray-100);
+        }
+
+        .holdings-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .holdings-table th,
+        .holdings-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .holdings-table th {
+            background: var(--gray-50);
+            font-weight: 600;
+            color: var(--gray-700);
+            font-size: 0.9rem;
+        }
+
+        .holdings-table tr:hover {
+            background: var(--gray-50);
+        }
+
+        .risk-indicator {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .risk-low {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .risk-medium {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .risk-high {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: var(--gray-600);
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--gray-200);
+            border-top: 4px solid var(--primary-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-container {
+                padding: 1rem;
+            }
+
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .analysis-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .control-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .control-group {
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <header class="header">
+            <h1>Portfolio Analytics</h1>
+            <p>Advanced performance analysis and risk management</p>
+        </header>
+
+        <div class="controls-panel">
+            <div class="control-row">
+                <div class="control-group">
+                    <label class="control-label">Account Number</label>
+                    <input type="text" class="control-input" id="accountInput" placeholder="Enter account number">
+                </div>
+                <div class="control-group">
+                    <label class="control-label">Start Date</label>
+                    <input type="date" class="control-input" id="startDate">
+                </div>
+                <div class="control-group">
+                    <label class="control-label">End Date</label>
+                    <input type="date" class="control-input" id="endDate">
+                </div>
+                <div class="control-group">
+                    <label class="control-label">Benchmark</label>
+                    <select class="control-input" id="benchmarkSelect">
+                        <option value="SPY">S&P 500 (SPY)</option>
+                        <option value="QQQ">NASDAQ (QQQ)</option>
+                        <option value="IWM">Russell 2000 (IWM)</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="loadAnalysis()">
+                    <span>📊</span> Analyze Performance
+                </button>
+            </div>
+        </div>
+
+        <div id="metricsSection" style="display: none;">
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <span class="metric-title">Total Return</span>
+                    </div>
+                    <div class="metric-value" id="totalReturn">--</div>
+                    <div class="metric-change" id="totalReturnChange">
+                        <span>vs Benchmark</span>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <span class="metric-title">Annualized Return</span>
+                    </div>
+                    <div class="metric-value" id="annualizedReturn">--</div>
+                    <div class="metric-change" id="annualizedChange">
+                        <span>CAGR</span>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <span class="metric-title">Volatility</span>
+                    </div>
+                    <div class="metric-value" id="volatility">--</div>
+                    <div class="metric-change" id="volatilityRisk">
+                        <span class="risk-indicator risk-medium">Medium Risk</span>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <span class="metric-title">Sharpe Ratio</span>
+                    </div>
+                    <div class="metric-value" id="sharpeRatio">--</div>
+                    <div class="metric-change" id="sharpeChange">
+                        <span>Risk-adjusted return</span>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <span class="metric-title">Max Drawdown</span>
+                    </div>
+                    <div class="metric-value" id="maxDrawdown">--</div>
+                    <div class="metric-change" id="drawdownDays">
+                        <span>Recovery period</span>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <span class="metric-title">Beta</span>
+                    </div>
+                    <div class="metric-value" id="beta">--</div>
+                    <div class="metric-change" id="betaDesc">
+                        <span>vs S&P 500</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3 class="chart-title">Performance Analysis</h3>
+                    <div class="chart-controls">
+                        <button class="tab-btn active" onclick="showChart('performance')">Performance</button>
+                        <button class="tab-btn" onclick="showChart('drawdown')">Drawdown</button>
+                        <button class="tab-btn" onclick="showChart('rolling')">Rolling Metrics</button>
+                    </div>
+                </div>
+                <canvas id="performanceChart" width="800" height="400"></canvas>
+            </div>
+
+            <div class="analysis-grid">
+                <div class="analysis-panel">
+                    <h3>Portfolio Composition</h3>
+                    <canvas id="compositionChart" width="400" height="300"></canvas>
+                </div>
+
+                <div class="analysis-panel">
+                    <h3>Top Holdings</h3>
+                    <table class="holdings-table">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Weight</th>
+                                <th>Return</th>
+                            </tr>
+                        </thead>
+                        <tbody id="holdingsBody">
+                            <tr>
+                                <td>AAPL</td>
+                                <td>15.2%</td>
+                                <td class="positive">+12.4%</td>
+                            </tr>
+                            <tr>
+                                <td>MSFT</td>
+                                <td>12.8%</td>
+                                <td class="positive">+8.7%</td>
+                            </tr>
+                            <tr>
+                                <td>GOOGL</td>
+                                <td>10.3%</td>
+                                <td class="negative">-2.1%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="loadingSection" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Loading portfolio analysis...</p>
+        </div>
+    </div>
+
+    <script>
+        let performanceChart = null;
+        let compositionChart = null;
+
+        // Set default dates
+        document.getElementById('endDate').valueAsDate = new Date();
+        const startDate = new Date();
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        document.getElementById('startDate').valueAsDate = startDate;
+
+        function loadAnalysis() {
+            const account = document.getElementById('accountInput').value;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            if (!account) {
+                alert('Please enter an account number');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loadingSection').style.display = 'block';
+            document.getElementById('metricsSection').style.display = 'none';
+
+            // Simulate loading delay
+            setTimeout(() => {
+                document.getElementById('loadingSection').style.display = 'none';
+                document.getElementById('metricsSection').style.display = 'block';
+
+                // Load mock data and create charts
+                loadMockData();
+                createPerformanceChart();
+                createCompositionChart();
+            }, 2000);
+        }
+
+        function loadMockData() {
+            // Update metrics with mock data
+            document.getElementById('totalReturn').textContent = '+24.7%';
+            document.getElementById('totalReturnChange').innerHTML = '<span class="positive">+3.2% vs SPY</span>';
+
+            document.getElementById('annualizedReturn').textContent = '18.9%';
+            document.getElementById('annualizedChange').innerHTML = '<span>CAGR</span>';
+
+            document.getElementById('volatility').textContent = '16.2%';
+            document.getElementById('volatilityRisk').innerHTML = '<span class="risk-indicator risk-medium">Medium Risk</span>';
+
+            document.getElementById('sharpeRatio').textContent = '1.34';
+            document.getElementById('sharpeChange').innerHTML = '<span class="positive">Above average</span>';
+
+            document.getElementById('maxDrawdown').textContent = '-8.4%';
+            document.getElementById('drawdownDays').innerHTML = '<span>45 days recovery</span>';
+
+            document.getElementById('beta').textContent = '0.87';
+            document.getElementById('betaDesc').innerHTML = '<span>vs S&P 500</span>';
+        }
+
+        function createPerformanceChart() {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+
+            if (performanceChart) {
+                performanceChart.destroy();
+            }
+
+            // Generate mock time series data
+            const dates = [];
+            const portfolioValues = [];
+            const benchmarkValues = [];
+
+            const startValue = 10000;
+            let portfolioVal = startValue;
+            let benchmarkVal = startValue;
+
+            for (let i = 0; i < 252; i++) { // One year of daily data
+                const date = new Date();
+                date.setDate(date.getDate() - (252 - i));
+                dates.push(date.toISOString().split('T')[0]);
+
+                // Simulate returns
+                const portfolioReturn = (Math.random() - 0.45) * 0.02;
+                const benchmarkReturn = (Math.random() - 0.48) * 0.018;
+
+                portfolioVal *= (1 + portfolioReturn);
+                benchmarkVal *= (1 + benchmarkReturn);
+
+                portfolioValues.push(portfolioVal);
+                benchmarkValues.push(benchmarkVal);
+            }
+
+            performanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Portfolio',
+                        data: portfolioValues,
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        tension: 0.4,
+                        fill: false
+                    }, {
+                        label: 'S&P 500',
+                        data: benchmarkValues,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        },
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'month'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createCompositionChart() {
+            const ctx = document.getElementById('compositionChart').getContext('2d');
+
+            if (compositionChart) {
+                compositionChart.destroy();
+            }
+
+            compositionChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Technology', 'Healthcare', 'Financials', 'Consumer Disc.', 'Others'],
+                    datasets: [{
+                        data: [35, 20, 15, 12, 18],
+                        backgroundColor: [
+                            '#2563eb',
+                            '#10b981',
+                            '#f59e0b',
+                            '#ef4444',
+                            '#8b5cf6'
+                        ],
+                        borderWidth: 2,
+                        borderColor: 'white'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        }
+                    }
+                }
+            });
+        }
+
+        function showChart(type) {
+            // Update active tab
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Here you would implement different chart views
+            switch(type) {
+                case 'performance':
+                    createPerformanceChart();
+                    break;
+                case 'drawdown':
+                    // Create drawdown chart
+                    break;
+                case 'rolling':
+                    // Create rolling metrics chart
+                    break;
+            }
+        }
+    </script>
+</body>
+</html>
