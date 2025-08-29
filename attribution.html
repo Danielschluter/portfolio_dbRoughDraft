@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -633,7 +631,7 @@
 
                 // Show attribution analysis if data is available
                 if (attributionData) {
-                    displayAttributionAnalysis(attributionData, accountNum, startDate, endDate);
+                    displaySecurityAttributionAnalysis(attributionData, accountNum, startDate, endDate);
                 }
             } else {
                 showError('No data found for account ' + accountNum);
@@ -673,8 +671,8 @@
         }
     }
 
-    // Display attribution analysis results
-    function displayAttributionAnalysis(attributionData, accountNum, startDate, endDate) {
+    // Display security-level attribution analysis results
+    function displaySecurityAttributionAnalysis(attributionData, accountNum, startDate, endDate) {
         // Create or get attribution container
         let container = document.getElementById('attributionContainer');
         if (!container) {
@@ -694,7 +692,7 @@
         }
 
         const summary = attributionData.summary;
-        const sectorData = attributionData.sector_attribution;
+        const securityData = attributionData.security_attribution; // Changed from sector_attribution
 
         container.innerHTML = `
             <div class="attribution-header">
@@ -750,19 +748,19 @@
                         <h4>Key Insight</h4>
                     </div>
                     <div class="card-insight">
-                        ${generateAttributionInsight(summary, sectorData)}
+                        ${generateAttributionInsight(summary, securityData)}
                     </div>
                 </div>
             </div>
 
             <div class="attribution-details">
                 <div class="detail-tabs">
-                    <button class="tab-btn active" onclick="showAttributionTab('sector')">Sector Breakdown</button>
+                    <button class="tab-btn active" onclick="showAttributionTab('security')">Security Breakdown</button> <!-- Changed to Security Breakdown -->
                     <button class="tab-btn" onclick="showAttributionTab('chart')">Visualization</button>
                 </div>
 
-                <div id="sectorTab" class="tab-content active">
-                    ${renderSectorAttributionTable(sectorData)}
+                <div id="securityTab" class="tab-content active"> <!-- Changed id to securityTab -->
+                    ${renderSecurityAttributionTable(securityData)} <!-- Changed to renderSecurityAttributionTable -->
                 </div>
 
                 <div id="chartTab" class="tab-content" style="display: none;">
@@ -776,45 +774,46 @@
         container.style.display = 'block';
 
         // Create the attribution chart (initially hidden)
-        setTimeout(() => createAttributionChart(sectorData), 100);
+        setTimeout(() => createAttributionChart(securityData), 100); // Changed to securityData
     }
 
     // Generate insight text based on attribution results
-    function generateAttributionInsight(summary, sectorData) {
+    function generateAttributionInsight(summary, securityData) { // Changed parameter name
         const totalActive = summary.total_active_return;
         const primaryDriver = summary.primary_driver;
-        const topSector = sectorData.reduce((max, sector) => 
-            Math.abs(sector.total_effect) > Math.abs(max.total_effect) ? sector : max
+        // Find the top contributing security
+        const topSecurity = securityData.reduce((max, security) => 
+            Math.abs(security.total_effect) > Math.abs(max.total_effect) ? security : max
         );
 
         if (totalActive > 50) {
-            return `Strong outperformance of +${totalActive} bps, primarily driven by ${primaryDriver.toLowerCase()}. ${topSector.sector} sector contributed ${topSector.total_effect > 0 ? '+' : ''}${topSector.total_effect} bps.`;
+            return `Strong outperformance of +${totalActive} bps, primarily driven by ${primaryDriver.toLowerCase()}. ${topSecurity.security_name} (Security) contributed ${topSecurity.total_effect > 0 ? '+' : ''}${topSecurity.total_effect} bps.`;
         } else if (totalActive > 0) {
-            return `Modest outperformance of +${totalActive} bps through ${primaryDriver.toLowerCase()}. Performance was balanced across sectors.`;
+            return `Modest outperformance of +${totalActive} bps through ${primaryDriver.toLowerCase()}. Performance was balanced across securities.`;
         } else if (totalActive > -50) {
-            return `Slight underperformance of ${totalActive} bps. ${topSector.sector} sector was the main detractor at ${topSector.total_effect} bps.`;
+            return `Slight underperformance of ${totalActive} bps. ${topSecurity.security_name} (Security) was the main detractor at ${topSecurity.total_effect} bps.`;
         } else {
-            return `Significant underperformance of ${totalActive} bps. ${primaryDriver} decisions negatively impacted returns, particularly in ${topSector.sector}.`;
+            return `Significant underperformance of ${totalActive} bps. ${primaryDriver} decisions negatively impacted returns, particularly with ${topSecurity.security_name} (Security).`;
         }
     }
 
-    // Render sector attribution table
-    function renderSectorAttributionTable(sectorData) {
-        const tableRows = sectorData.map(sector => `
+    // Render security attribution table
+    function renderSecurityAttributionTable(securityData) { // Changed function name
+        const tableRows = securityData.map(security => ` // Changed variable name
             <tr>
-                <td class="sector-name">${sector.sector}</td>
-                <td class="number-cell">${sector.portfolio_weight}%</td>
-                <td class="number-cell">${sector.benchmark_weight}%</td>
-                <td class="number-cell">${sector.portfolio_return}%</td>
-                <td class="number-cell">${sector.benchmark_return}%</td>
-                <td class="number-cell ${sector.allocation_effect >= 0 ? 'positive' : 'negative'}">
-                    ${sector.allocation_effect > 0 ? '+' : ''}${sector.allocation_effect}
+                <td class="sector-name">${security.security_name}</td> <!-- Changed from sector to security_name -->
+                <td class="number-cell">${security.portfolio_weight}%</td>
+                <td class="number-cell">${security.benchmark_weight}%</td>
+                <td class="number-cell">${security.portfolio_return}%</td>
+                <td class="number-cell">${security.benchmark_return}%</td>
+                <td class="number-cell ${security.allocation_effect >= 0 ? 'positive' : 'negative'}">
+                    ${security.allocation_effect > 0 ? '+' : ''}${security.allocation_effect}
                 </td>
-                <td class="number-cell ${sector.selection_effect >= 0 ? 'positive' : 'negative'}">
-                    ${sector.selection_effect > 0 ? '+' : ''}${sector.selection_effect}
+                <td class="number-cell ${security.selection_effect >= 0 ? 'positive' : 'negative'}">
+                    ${security.selection_effect > 0 ? '+' : ''}${security.selection_effect}
                 </td>
-                <td class="number-cell ${sector.total_effect >= 0 ? 'positive' : 'negative'}">
-                    <strong>${sector.total_effect > 0 ? '+' : ''}${sector.total_effect}</strong>
+                <td class="number-cell ${security.total_effect >= 0 ? 'positive' : 'negative'}">
+                    <strong>${security.total_effect > 0 ? '+' : ''}${security.total_effect}</strong>
                 </td>
             </tr>
         `).join('');
@@ -823,7 +822,7 @@
             <table class="attribution-table">
                 <thead>
                     <tr>
-                        <th>Sector</th>
+                        <th>Security Name</th> <!-- Changed from Sector -->
                         <th>Portfolio Weight</th>
                         <th>Benchmark Weight</th>
                         <th>Portfolio Return</th>
@@ -841,17 +840,17 @@
     }
 
     // Create attribution waterfall chart
-    function createAttributionChart(sectorData) {
+    function createAttributionChart(securityData) { // Changed parameter name
         const canvas = document.getElementById('attributionChart');
         if (!canvas) return;
 
         const ctx = canvas.getContext('2d');
 
         // Prepare data for stacked bar chart
-        const labels = sectorData.map(s => s.sector);
-        const allocationData = sectorData.map(s => s.allocation_effect);
-        const selectionData = sectorData.map(s => s.selection_effect);
-        const interactionData = sectorData.map(s => s.interaction_effect);
+        const labels = securityData.map(s => s.security_name); // Changed from security_name
+        const allocationData = securityData.map(s => s.allocation_effect);
+        const selectionData = securityData.map(s => s.selection_effect);
+        const interactionData = securityData.map(s => s.interaction_effect); // Assuming interaction_effect exists
 
         if (window.attributionChart) {
             window.attributionChart.destroy();
@@ -870,7 +869,7 @@
                         borderWidth: 1
                     },
                     {
-                        label: 'Selection Effect', 
+                        label: 'Selection Effect',
                         data: selectionData,
                         backgroundColor: '#10b981',
                         borderColor: '#059669',
@@ -917,12 +916,12 @@
                         callbacks: {
                             afterBody: function(context) {
                                 const dataIndex = context[0].dataIndex;
-                                const sector = sectorData[dataIndex];
+                                const security = securityData[dataIndex]; // Changed variable name
                                 return [
-                                    `Portfolio Weight: ${sector.portfolio_weight}%`,
-                                    `Benchmark Weight: ${sector.benchmark_weight}%`,
-                                    `Weight Difference: ${(sector.portfolio_weight - sector.benchmark_weight).toFixed(1)}%`,
-                                    `Return Difference: ${(sector.portfolio_return - sector.benchmark_return).toFixed(2)}%`
+                                    `Portfolio Weight: ${security.portfolio_weight}%`,
+                                    `Benchmark Weight: ${security.benchmark_weight}%`,
+                                    `Weight Difference: ${(security.portfolio_weight - security.benchmark_weight).toFixed(1)}%`,
+                                    `Return Difference: ${(security.portfolio_return - security.benchmark_return).toFixed(2)}%`
                                 ];
                             }
                         }
@@ -1134,7 +1133,7 @@
             background: #f8fafc;
         }
 
-        .sector-name {
+        .sector-name { /* Keep for potential fallback, though ideally only security_name is used */
             font-weight: 600;
             color: #1f2937;
         }
@@ -1202,13 +1201,13 @@
     // Export functions for use in other parts of the application
     window.AttributionAnalysis = {
         loadAttributionAnalysis,
-        displayAttributionAnalysis,
+        displaySecurityAttributionAnalysis, // Changed to security version
         showAttributionTab,
         createAttributionChart
     };
 
 
-    
+
     function showHoldingsModal(date, accountNum) {
       const modal = document.getElementById('holdingsModal');
       const modalTitle = document.getElementById('modalTitle');
