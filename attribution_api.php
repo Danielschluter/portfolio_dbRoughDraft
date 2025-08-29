@@ -25,7 +25,7 @@ $acct_num = $_GET['acct_num'] ?? null;
 $start_date = $_GET['start_date'] ?? null;
 $end_date = $_GET['end_date'] ?? null;
 $benchmark = $_GET['benchmark'] ?? 'SPY';
-$attribution_type = $_GET['type'] ?? 'security'; // summary, timeseries, security
+$attribution_type = $_GET['type'] ?? 'summary'; // summary, timeseries, security
 
 if (!$acct_num) {
     http_response_code(400);
@@ -250,96 +250,25 @@ class AttributionAnalyzer {
      */
     public function getSecurityAttribution() {
         $sql = "
-        WITH security_performance AS (
-            SELECT 
-                t.ticker,
-                t.transaction_date,
-                t.shares,
-                p.close as price,
-                SUM(t.shares) OVER (PARTITION BY t.ticker ORDER BY t.transaction_date) as cumulative_shares,
-                p.close / LAG(p.close) OVER (PARTITION BY t.ticker ORDER BY t.transaction_date) - 1 as daily_return,
-                -- Calculate market value
-                SUM(t.shares) OVER (PARTITION BY t.ticker ORDER BY t.transaction_date) * p.close as market_value
-            FROM transactions_temp t
-            JOIN prices_stocks p ON t.ticker = p.ticker AND t.transaction_date = p.date
-            WHERE t.acct_num = $1
-            AND ($2 IS NULL OR t.transaction_date >= $2)
-            AND ($3 IS NULL OR t.transaction_date <= $3)
-        ),
-        
-        portfolio_totals AS (
-            SELECT 
-                transaction_date,
-                SUM(market_value) as total_portfolio_value
-            FROM security_performance
-            WHERE cumulative_shares > 0
-            GROUP BY transaction_date
-        ),
-        
-        benchmark_returns AS (
-            SELECT 
-                date,
-                close / LAG(close) OVER (ORDER BY date) - 1 as benchmark_return
-            FROM prices_stocks 
-            WHERE ticker = '$4'
-            AND ($2 IS NULL OR date >= $2)
-            AND ($3 IS NULL OR date <= $3)
-        ),
-        
-        security_attribution AS (
-            SELECT 
-                sp.ticker,
-                -- Average portfolio weight over the period
-                AVG(sp.market_value / pt.total_portfolio_value) * 100 as avg_portfolio_weight_pct,
-                
-                -- Security total return
-                (MAX(sp.price) / MIN(sp.price) - 1) * 100 as total_return_pct,
-                
-                -- Average daily return
-                AVG(sp.daily_return) * 100 as avg_daily_return_pct,
-                
-                -- Contribution to portfolio return (weight * return)
-                AVG(sp.market_value / pt.total_portfolio_value) * 
-                (MAX(sp.price) / MIN(sp.price) - 1) * 10000 as contribution_bps,
-                
-                -- Excess return vs benchmark
-                (MAX(sp.price) / MIN(sp.price) - 1) - 
-                COALESCE((SELECT (MAX(close) / MIN(close) - 1) FROM prices_stocks WHERE ticker = '$4' 
-                         AND date >= MIN(sp.transaction_date) AND date <= MAX(sp.transaction_date)), 0) as excess_return,
-                
-                -- Final market value
-                MAX(sp.market_value) as final_market_value,
-                
-                -- Number of days held
-                COUNT(*) as days_held
-                
-            FROM security_performance sp
-            JOIN portfolio_totals pt ON sp.transaction_date = pt.transaction_date
-            WHERE sp.cumulative_shares > 0
-            GROUP BY sp.ticker
-        )
-        
         SELECT 
-            ticker,
-            avg_portfolio_weight_pct as portfolio_weight,
-            total_return_pct as total_return,
-            avg_daily_return_pct as avg_daily_return,
-            contribution_bps as contribution,
-            excess_return * 100 as excess_return_pct,
-            final_market_value,
-            days_held,
-            CASE 
-                WHEN contribution_bps > 0 THEN 'Contributor'
-                ELSE 'Detractor'
-            END as attribution_type
-        FROM security_attribution
+            t.ticker,
+            SUM(t.shares * p.close) / SUM(SUM(t.shares * p.close)) OVER () * 100 as portfolio_weight_pct,
+            AVG(p.close / LAG(p.close) OVER (PARTITION BY t.ticker ORDER BY t.transaction_date) - 1) * 100 as avg_return_pct,
+            -- Simplified contribution calculation
+            SUM(t.shares * (p.close / LAG(p.close) OVER (PARTITION BY t.ticker ORDER BY t.transaction_date) - 1)) * 10000 as contribution_bps
+        FROM transactions_temp t
+        JOIN prices_stocks p ON t.ticker = p.ticker AND t.transaction_date = p.date
+        WHERE t.acct_num = $1
+        AND ($2 IS NULL OR t.transaction_date >= $2)
+        AND ($3 IS NULL OR t.transaction_date <= $3)
+        GROUP BY t.ticker
+        HAVING SUM(t.shares) > 0
         ORDER BY contribution_bps DESC";
         
         $result = pg_query_params($this->con, $sql, [
             $this->acct_num, 
             $this->start_date, 
-            $this->end_date,
-            $this->benchmark
+            $this->end_date
         ]);
         
         if (!$result) {
@@ -350,14 +279,9 @@ class AttributionAnalyzer {
         while ($row = pg_fetch_assoc($result)) {
             $securities[] = [
                 'ticker' => $row['ticker'],
-                'portfolio_weight' => round(floatval($row['portfolio_weight']), 2),
-                'total_return' => round(floatval($row['total_return']), 2),
-                'avg_daily_return' => round(floatval($row['avg_daily_return']), 4),
-                'contribution' => round(floatval($row['contribution']), 1),
-                'excess_return' => round(floatval($row['excess_return_pct']), 2),
-                'final_market_value' => round(floatval($row['final_market_value']), 2),
-                'days_held' => intval($row['days_held']),
-                'attribution_type' => $row['attribution_type']
+                'portfolio_weight' => round(floatval($row['portfolio_weight_pct']), 2),
+                'avg_return' => round(floatval($row['avg_return_pct']), 2),
+                'contribution' => round(floatval($row['contribution_bps']), 1)
             ];
         }
         
@@ -368,39 +292,26 @@ class AttributionAnalyzer {
      * Get attribution summary statistics
      */
     public function getAttributionSummary() {
-        $securityData = $this->getSecurityAttribution();
+        $sectorData = $this->getSectorAttribution();
         
-        $totalContribution = array_sum(array_column($securityData, 'contribution'));
-        $positiveContributions = array_filter($securityData, fn($s) => $s['contribution'] > 0);
-        $negativeContributions = array_filter($securityData, fn($s) => $s['contribution'] < 0);
-        
-        $totalPositive = array_sum(array_column($positiveContributions, 'contribution'));
-        $totalNegative = array_sum(array_column($negativeContributions, 'contribution'));
+        $totalAllocation = array_sum(array_column($sectorData, 'allocation_effect'));
+        $totalSelection = array_sum(array_column($sectorData, 'selection_effect'));
+        $totalInteraction = array_sum(array_column($sectorData, 'interaction_effect'));
+        $totalActive = $totalAllocation + $totalSelection + $totalInteraction;
         
         // Calculate hit rates
-        $positiveCount = count($positiveContributions);
-        $totalCount = count($securityData);
-        
-        // Top and bottom contributors
-        $topContributor = !empty($securityData) ? $securityData[0] : null;
-        $bottomContributor = !empty($securityData) ? end($securityData) : null;
+        $positiveAllocations = count(array_filter($sectorData, fn($s) => $s['allocation_effect'] > 0));
+        $positiveSelections = count(array_filter($sectorData, fn($s) => $s['selection_effect'] > 0));
+        $totalSectors = count($sectorData);
         
         return [
-            'total_contribution' => round($totalContribution, 1),
-            'positive_contribution' => round($totalPositive, 1),
-            'negative_contribution' => round($totalNegative, 1),
-            'hit_rate' => $totalCount > 0 ? round($positiveCount / $totalCount * 100, 1) : 0,
-            'total_securities' => $totalCount,
-            'positive_securities' => $positiveCount,
-            'negative_securities' => count($negativeContributions),
-            'top_contributor' => $topContributor ? [
-                'ticker' => $topContributor['ticker'],
-                'contribution' => $topContributor['contribution']
-            ] : null,
-            'bottom_contributor' => $bottomContributor ? [
-                'ticker' => $bottomContributor['ticker'],
-                'contribution' => $bottomContributor['contribution']
-            ] : null,
+            'total_allocation_effect' => round($totalAllocation, 1),
+            'total_selection_effect' => round($totalSelection, 1),
+            'total_interaction_effect' => round($totalInteraction, 1),
+            'total_active_return' => round($totalActive, 1),
+            'allocation_hit_rate' => $totalSectors > 0 ? round($positiveAllocations / $totalSectors * 100, 1) : 0,
+            'selection_hit_rate' => $totalSectors > 0 ? round($positiveSelections / $totalSectors * 100, 1) : 0,
+            'primary_driver' => abs($totalAllocation) > abs($totalSelection) ? 'allocation' : 'selection',
             'analysis_period' => [
                 'start_date' => $this->start_date,
                 'end_date' => $this->end_date,
@@ -417,7 +328,7 @@ try {
         case 'summary':
             $result = [
                 'summary' => $analyzer->getAttributionSummary(),
-                'security_attribution' => $analyzer->getSecurityAttribution()
+                'sector_attribution' => $analyzer->getSectorAttribution()
             ];
             break;
             
@@ -429,18 +340,8 @@ try {
             $result = $analyzer->getSecurityAttribution();
             break;
             
-        case 'sector':
-            $result = [
-                'summary' => $analyzer->getAttributionSummary(),
-                'sector_attribution' => $analyzer->getSectorAttribution()
-            ];
-            break;
-            
         default:
-            $result = [
-                'summary' => $analyzer->getAttributionSummary(),
-                'security_attribution' => $analyzer->getSecurityAttribution()
-            ];
+            throw new Exception('Invalid attribution type');
     }
     
     echo json_encode($result, JSON_NUMERIC_CHECK);
