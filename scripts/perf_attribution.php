@@ -1,0 +1,88 @@
+<?php
+header('Content-Type: application/json');
+$conn_string = 'postgres://avnadmin:AVNS_3hYJYnbM0v0az16FLB0@pg-28325ccc-daniel-0eca.a.aivencloud.com:26974/defaultdb?sslmode=require';
+$con = pg_connect($conn_string);
+
+
+$sql = "-- =================================================================
+-- Final Resilient Query for Contribution to Return
+-- =================================================================
+WITH
+  date_range AS (
+    SELECT
+      '2025-01-01' :: DATE AS period_start,
+      '2025-07-31' :: DATE AS period_end
+  ),
+  valid_dates AS (
+    SELECT
+      period_start,
+      period_end,
+      (SELECT MAX(date) FROM prices_stocks WHERE date < period_start) AS start_price_date,
+      (SELECT MAX(date) FROM prices_stocks WHERE date <= period_end) AS end_price_date
+    FROM date_range
+  ),
+  holding_calculations AS (
+    SELECT
+      tr.ticker,
+      SUM(CASE WHEN tr.transaction_date < (SELECT period_start FROM valid_dates) THEN tr.shares ELSE 0 END) AS beginning_shares,
+      SUM(tr.shares) AS ending_shares,
+      SUM(CASE WHEN tr.transaction_date >= (SELECT period_start FROM valid_dates) AND tr.transaction_date <= (SELECT period_end FROM valid_dates) THEN tr.amount ELSE 0 END) AS net_cash_flow
+    FROM transactions_temp tr
+    WHERE tr.acct_num = 592 AND tr.transaction_date <= (SELECT period_end FROM valid_dates)
+    GROUP BY tr.ticker
+  ),
+  performance_metrics AS (
+    SELECT
+      hc.ticker,
+      (hc.beginning_shares * p_start.close) AS beginning_market_value,
+      (hc.ending_shares * p_end.close) AS ending_market_value,
+      hc.net_cash_flow
+    FROM
+      holding_calculations hc
+      CROSS JOIN valid_dates vd
+      LEFT JOIN prices_stocks p_start ON hc.ticker = p_start.ticker AND p_start.date = vd.start_price_date
+      LEFT JOIN prices_stocks p_end ON hc.ticker = p_end.ticker AND p_end.date = vd.end_price_date
+  ),
+  -- New CTE to calculate total portfolio value separately to keep the final SELECT clean
+  final_calcs AS (
+    SELECT *,
+      SUM(COALESCE(beginning_market_value, 0)) OVER () as total_portfolio_bmv
+    FROM performance_metrics
+  )
+-- Final calculation and presentation with protection against division by zero
+SELECT
+  fc.ticker,
+  COALESCE(fc.beginning_market_value, 0) AS beginning_market_value,
+  COALESCE(fc.ending_market_value, 0) AS ending_market_value,
+  COALESCE(fc.net_cash_flow, 0) AS net_cash_flow,
+  (COALESCE(fc.ending_market_value, 0) - COALESCE(fc.beginning_market_value, 0) - COALESCE(fc.net_cash_flow, 0)) AS gain_loss,
+  fc.total_portfolio_bmv,
+  -- *** THE FIX IS HERE ***
+  -- Use a CASE statement to prevent division by zero
+  CASE
+    WHEN fc.total_portfolio_bmv = 0 THEN 0 -- If starting value is 0, contribution is 0
+    ELSE (
+      (COALESCE(fc.ending_market_value, 0) - COALESCE(fc.beginning_market_value, 0) - COALESCE(fc.net_cash_flow, 0)) / fc.total_portfolio_bmv
+    ) * 100
+  END AS contribution_to_return_pct
+FROM
+  final_calcs fc
+WHERE
+  COALESCE(fc.beginning_market_value, 0) <> 0
+  OR COALESCE(fc.ending_market_value, 0) <> 0
+  OR COALESCE(fc.net_cash_flow, 0) <> 0
+ORDER BY
+  contribution_to_return_pct DESC;";
+
+$result = pg_query($con, $sql);
+
+$returnArr = [];
+
+while ($row = pg_fetch_assoc($result)) {
+    $returnArr[] = $row;
+};
+
+echo json_encode($returnArr, JSON_NUMERIC_CHECK);
+
+
+?>

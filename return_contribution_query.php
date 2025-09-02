@@ -1,6 +1,5 @@
-
 <?php
-
+header('Content-Type: application/json');
 $conn_string = 'postgres://avnadmin:AVNS_3hYJYnbM0v0az16FLB0@pg-28325ccc-daniel-0eca.a.aivencloud.com:26974/defaultdb?sslmode=require';
 $con = pg_connect($conn_string);
 
@@ -132,7 +131,7 @@ while ($row = pg_fetch_assoc($result)) {
     $returnArr[] = $row;
 }
 
-header('Content-Type: application/json');
+
 echo json_encode($returnArr, JSON_NUMERIC_CHECK);
 
 pg_close($con);
