@@ -332,7 +332,16 @@
       hideEmptyState();
       
       try {
-        const response = await fetch(`scripts/perf_attribution.php`);
+        // Build URL with parameters
+        let url = `scripts/perf_attribution.php?acct_num=${accountNum}`;
+        if (startDate) {
+          url += `&start_date=${startDate}`;
+        }
+        if (endDate) {
+          url += `&end_date=${endDate}`;
+        }
+        
+        const response = await fetch(url);
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
