@@ -3,6 +3,11 @@ header('Content-Type: application/json');
 $conn_string = 'postgres://avnadmin:AVNS_3hYJYnbM0v0az16FLB0@pg-28325ccc-daniel-0eca.a.aivencloud.com:26974/defaultdb?sslmode=require';
 $con = pg_connect($conn_string);
 
+$acct_num = $_GET['acct_num'];
+$start_date = $_GET['start_date'];
+$end_date = $_GET['end_date'];
+
+
 
 $sql = "-- =================================================================
 -- Final Resilient Query for Contribution to Return
@@ -10,8 +15,8 @@ $sql = "-- =================================================================
 WITH
   date_range AS (
     SELECT
-      '2025-01-01' :: DATE AS period_start,
-      '2025-07-31' :: DATE AS period_end
+      '".$start_date."' :: DATE AS period_start,
+      '".$end_date."' :: DATE AS period_end
   ),
   valid_dates AS (
     SELECT
@@ -28,7 +33,7 @@ WITH
       SUM(tr.shares) AS ending_shares,
       SUM(CASE WHEN tr.transaction_date >= (SELECT period_start FROM valid_dates) AND tr.transaction_date <= (SELECT period_end FROM valid_dates) THEN tr.amount ELSE 0 END) AS net_cash_flow
     FROM transactions_temp tr
-    WHERE tr.acct_num = 592 AND tr.transaction_date <= (SELECT period_end FROM valid_dates)
+    WHERE tr.acct_num = ".$acct_num." AND tr.transaction_date <= (SELECT period_end FROM valid_dates)
     GROUP BY tr.ticker
   ),
   performance_metrics AS (
