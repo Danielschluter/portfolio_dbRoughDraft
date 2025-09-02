@@ -1,10 +1,203 @@
+
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Performance Query Results</title>
+  <title>Performance Attribution Analysis</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <style>
+    .controls-container {
+      background: #fff;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: flex;
+      gap: 20px;
+      align-items: end;
+      flex-wrap: wrap;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 150px;
+    }
+
+    .control-group label {
+      font-weight: 600;
+      color: #374151;
+      font-size: 14px;
+    }
+
+    .control-group select,
+    .control-group input {
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 14px;
+      background: white;
+    }
+
+    .control-group select:focus,
+    .control-group input:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .load-btn {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .load-btn:hover {
+      background: #2563eb;
+    }
+
+    .load-btn:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+
+    .attribution-container {
+      background: #fff;
+      padding: 24px;
+      margin: 20px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: none;
+    }
+
+    .attribution-header {
+      text-align: center;
+      margin-bottom: 24px;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 16px;
+    }
+
+    .attribution-header h2 {
+      color: #1f2937;
+      margin: 0 0 8px 0;
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .attribution-period {
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .tbl-container {
+      background: #fff;
+      height: 400px;
+      overflow-y: scroll;
+      position: relative;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+
+    .virtual-scroll-content {
+      position: relative;
+    }
+
+    .header-row {
+      position: sticky;
+      top: 0;
+      background: #f1f1f1;
+      z-index: 1;
+      display: flex;
+      border-left: 1px solid #ccc;
+    }
+
+    .div-row {
+      height: 35px;
+      display: flex;
+      border-left: 1px solid #ccc;
+      background-color: #fff;
+    }
+
+    .div-row > div, .header-row > div {
+      background-color: #f8f9fa;
+      color: #433E3F;
+      margin-top: 1px;
+      margin-bottom: 1px;
+      text-align: right;
+      font-family: "DM Sans", serif;
+      font-size: 14px;
+      padding: 6px;
+      border-right: 1px solid #ccc;
+      border-bottom: 1px solid #ccc;
+      flex: 1;
+      min-width: 120px;
+      box-sizing: border-box;
+    }
+
+    .div-row > div:first-child, .header-row > div:first-child {
+      text-align: left;
+      font-weight: 600;
+      flex: 1.5;
+    }
+
+    .header-row > div {
+      background-color: #f1f1f1;
+      font-weight: 600;
+    }
+
+    .positive {
+      color: #059669;
+      font-weight: 600;
+    }
+
+    .negative {
+      color: #dc2626;
+      font-weight: 600;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #6b7280;
+    }
+
+    .error {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #dc2626;
+      padding: 12px;
+      border-radius: 6px;
+      margin: 10px 0;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #6b7280;
+    }
+
+    .empty-state h3 {
+      margin: 0 0 8px 0;
+      color: #374151;
+    }
+
+    .chart-container {
+      margin: 20px 0;
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+  </style>
 </head>
 <body>
   <div class="menu-icon" onclick="toggleMenu()">☰ Menu</div>
@@ -21,9 +214,362 @@
   </div>
 
   <div class="content">
+    <h1>Performance Attribution Analysis</h1>
+    
+    <div class="controls-container">
+      <div class="control-group">
+        <label for="accountSelect">Account Number</label>
+        <select id="accountSelect">
+          <option value="">Select Account...</option>
+        </select>
+      </div>
+      
+      <div class="control-group">
+        <label for="startDate">Start Date</label>
+        <input type="date" id="startDate">
+      </div>
+      
+      <div class="control-group">
+        <label for="endDate">End Date</label>
+        <input type="date" id="endDate">
+      </div>
+      
+      <div class="control-group">
+        <button id="loadBtn" class="load-btn" disabled>Load Attribution</button>
+      </div>
+    </div>
 
+    <div id="loading" class="loading" style="display: none;">
+      <p>Loading attribution analysis...</p>
+    </div>
 
+    <div id="error" class="error" style="display: none;"></div>
+
+    <div class="attribution-container" id="attributionContainer">
+      <div class="attribution-header">
+        <h2>Contribution to Return Analysis</h2>
+        <div class="attribution-period" id="attributionPeriod"></div>
+      </div>
+
+      <div class="chart-container" id="chartContainer" style="display: none;">
+        <div id="contributionChart"></div>
+      </div>
+
+      <div class="tbl-container" id="tableContainer" style="display: none;">
+        <div class="header-row" id="dynamicHeader"></div>
+        <div class="virtual-scroll-content"></div>
+      </div>
+    </div>
+
+    <div class="empty-state" id="emptyState">
+      <h3>Performance Attribution Analysis</h3>
+      <p>Select an account and date range to analyze contribution to return by individual securities.</p>
+    </div>
   </div>
 
+  <script>
+    let accounts = [];
+    let attributionData = [];
+
+    // Load accounts on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      loadAccounts();
+      setupEventListeners();
+      setDefaultDates();
+    });
+
+    function setupEventListeners() {
+      const accountSelect = document.getElementById('accountSelect');
+      const loadBtn = document.getElementById('loadBtn');
+      
+      accountSelect.addEventListener('change', function() {
+        loadBtn.disabled = !this.value;
+      });
+      
+      loadBtn.addEventListener('click', loadAttributionData);
+    }
+
+    function setDefaultDates() {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setFullYear(endDate.getFullYear() - 1);
+      
+      document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+      document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+    }
+
+    async function loadAccounts() {
+      try {
+        const response = await fetch('scripts/loadaccounts.php');
+        accounts = await response.json();
+        
+        const accountSelect = document.getElementById('accountSelect');
+        accountSelect.innerHTML = '<option value="">Select Account...</option>';
+        
+        accounts.forEach(account => {
+          const option = document.createElement('option');
+          option.value = account.acct_num;
+          option.textContent = account.acct_num;
+          accountSelect.appendChild(option);
+        });
+      } catch (error) {
+        showError('Failed to load accounts: ' + error.message);
+      }
+    }
+
+    async function loadAttributionData() {
+      const accountNum = document.getElementById('accountSelect').value;
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      
+      if (!accountNum) {
+        showError('Please select an account');
+        return;
+      }
+
+      showLoading(true);
+      hideError();
+      hideEmptyState();
+      
+      try {
+        const response = await fetch(`scripts/perf_attribution.php`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data && data.length > 0) {
+          attributionData = data;
+          displayAttributionData(data, accountNum, startDate, endDate);
+        } else {
+          showError('No attribution data found for the selected criteria');
+        }
+        
+      } catch (error) {
+        console.error('Error loading attribution data:', error);
+        showError('Failed to load attribution data: ' + error.message);
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    function displayAttributionData(data, accountNum, startDate, endDate) {
+      // Update period display
+      const periodElement = document.getElementById('attributionPeriod');
+      periodElement.textContent = `Account: ${accountNum} | ${startDate || 'Inception'} to ${endDate || 'Latest'}`;
+      
+      // Show attribution container
+      document.getElementById('attributionContainer').style.display = 'block';
+      
+      // Create table
+      createAttributionTable(data);
+      
+      // Create chart
+      createContributionChart(data);
+    }
+
+    function createAttributionTable(data) {
+      const headerRow = document.getElementById('dynamicHeader');
+      const container = document.getElementById('tableContainer');
+      
+      // Clear existing content
+      headerRow.innerHTML = '';
+      
+      if (!data || data.length === 0) return;
+      
+      // Create headers from first row keys
+      const firstRow = data[0];
+      Object.keys(firstRow).forEach(key => {
+        const headerDiv = document.createElement('div');
+        headerDiv.textContent = formatHeaderName(key);
+        headerRow.appendChild(headerDiv);
+      });
+      
+      // Initialize virtual scroll
+      container.style.display = 'block';
+      new VirtualScroll(container, data);
+    }
+
+    function createContributionChart(data) {
+      const chartContainer = document.getElementById('chartContainer');
+      chartContainer.style.display = 'block';
+      
+      const tickers = data.map(item => item.ticker);
+      const contributions = data.map(item => parseFloat(item.contribution_to_return_pct) || 0);
+      
+      const options = {
+        series: [{
+          name: 'Contribution to Return',
+          data: contributions
+        }],
+        chart: {
+          type: 'bar',
+          height: 400,
+          toolbar: {
+            show: true
+          }
+        },
+        plotOptions: {
+          bar: {
+            colors: {
+              ranges: [{
+                from: -100,
+                to: 0,
+                color: '#ef4444'
+              }, {
+                from: 0,
+                to: 100,
+                color: '#10b981'
+              }]
+            },
+            columnWidth: '70%',
+            distributed: false
+          }
+        },
+        dataLabels: {
+          enabled: false
+        },
+        xaxis: {
+          categories: tickers,
+          title: {
+            text: 'Securities'
+          }
+        },
+        yaxis: {
+          title: {
+            text: 'Contribution to Return (%)'
+          }
+        },
+        title: {
+          text: 'Contribution to Return by Security',
+          align: 'center',
+          style: {
+            fontSize: '16px',
+            fontWeight: 600
+          }
+        },
+        grid: {
+          yaxis: {
+            lines: {
+              show: true
+            }
+          }
+        },
+        tooltip: {
+          y: {
+            formatter: function(val) {
+              return val.toFixed(2) + '%';
+            }
+          }
+        }
+      };
+
+      const chart = new ApexCharts(document.querySelector("#contributionChart"), options);
+      chart.render();
+    }
+
+    function formatHeaderName(key) {
+      return key.replace(/_/g, ' ')
+                .replace(/\b\w/g, l => l.toUpperCase())
+                .replace(/Pct/g, '%')
+                .replace(/Bmv/g, 'BMV');
+    }
+
+    class VirtualScroll {
+      constructor(container, data) {
+        this.container = container;
+        this.itemHeight = 35;
+        this.content = container.querySelector('.virtual-scroll-content');
+        this.data = data;
+        this.totalItems = data.length;
+        this.visibleItems = Math.ceil(container.clientHeight / this.itemHeight);
+        
+        this.setupScroll();
+        this.render();
+        
+        this.container.addEventListener('scroll', () => {
+          window.requestAnimationFrame(() => this.render());
+        });
+      }
+
+      createRow(rowData, index) {
+        const row = document.createElement('div');
+        row.className = 'div-row';
+        
+        for (let key in rowData) {
+          const cell = document.createElement('div');
+          let value = rowData[key];
+          
+          // Format numeric values
+          if (key.includes('pct') || key.includes('return')) {
+            value = parseFloat(value) || 0;
+            cell.textContent = value.toFixed(2) + '%';
+            if (value > 0) cell.classList.add('positive');
+            if (value < 0) cell.classList.add('negative');
+          } else if (key.includes('value') || key.includes('flow')) {
+            value = parseFloat(value) || 0;
+            cell.textContent = new Intl.NumberFormat('en-US', {
+              style: 'currency',
+              currency: 'USD'
+            }).format(value);
+          } else {
+            cell.textContent = value;
+          }
+          
+          row.appendChild(cell);
+        }
+        
+        return row;
+      }
+
+      setupScroll() {
+        this.content.style.height = `${this.totalItems * this.itemHeight}px`;
+      }
+
+      render() {
+        const scrollTop = this.container.scrollTop;
+        const startIndex = Math.floor(scrollTop / this.itemHeight);
+        const endIndex = Math.min(startIndex + this.visibleItems + 2, this.totalItems);
+
+        this.content.innerHTML = '';
+
+        for(let i = startIndex; i < endIndex; i++) {
+          if (i >= 0 && i < this.data.length) {
+            const row = this.createRow(this.data[i], i);
+            row.style.position = 'absolute';
+            row.style.top = `${i * this.itemHeight}px`;
+            row.style.width = '100%';
+            this.content.appendChild(row);
+          }
+        }
+      }
+    }
+
+    function showLoading(show) {
+      document.getElementById('loading').style.display = show ? 'block' : 'none';
+    }
+
+    function showError(message) {
+      const errorElement = document.getElementById('error');
+      errorElement.textContent = message;
+      errorElement.style.display = 'block';
+    }
+
+    function hideError() {
+      document.getElementById('error').style.display = 'none';
+    }
+
+    function hideEmptyState() {
+      document.getElementById('emptyState').style.display = 'none';
+    }
+
+    // Menu toggle function (if needed)
+    function toggleMenu() {
+      const sidebar = document.querySelector('.sidebar');
+      sidebar.classList.toggle('active');
+    }
+  </script>
 </body>
 </html>
