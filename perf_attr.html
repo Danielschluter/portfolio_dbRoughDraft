@@ -512,8 +512,23 @@
             value = parseFloat(value) || 0;
             cell.textContent = new Intl.NumberFormat('en-US', {
               style: 'currency',
-              currency: 'USD'
+              currency: 'USD',
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
             }).format(value);
+          } else if (key.includes('market_value') || key.includes('gain_loss')) {
+            // Handle other numeric columns that should show 2 decimal places
+            value = parseFloat(value) || 0;
+            cell.textContent = new Intl.NumberFormat('en-US', {
+              style: 'currency',
+              currency: 'USD',
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
+            }).format(value);
+          } else if (!isNaN(parseFloat(value)) && isFinite(value)) {
+            // For any other numeric values, show 2 decimal places
+            value = parseFloat(value) || 0;
+            cell.textContent = value.toFixed(2);
           } else {
             cell.textContent = value;
           }
