@@ -12,7 +12,8 @@
             background-color: #f4f4f4;
         }
         .container {
-            max-width: 900px;
+            max-width: 1140px;
+            width: 90vw;
             margin: auto;
             background: #fff;
             padding: 20px;
@@ -170,7 +171,9 @@
                         } else if (col === 'ticker') {
                              tableHTML += `<td>${row[col]}</td>`;
                         } else {
-                            tableHTML += `<td>${(row[col] * 1).toFixed(2)}</td>`;
+                            // Format as currency
+                            tableHTML += `<td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row[col])}</td>`;
+
                         }
                        
                     }
@@ -206,6 +209,433 @@
                 resultsContainer.innerHTML = '<p>An error occurred while fetching data. Please check the console for details.</p>';
             }
         }
+    </script>
+
+    <script>
+
+        const data = [
+            {
+                date: "2024-09-30",
+                ticker: "SNOW",
+                shares: 0,
+                close: 114.86,
+                totalshares: 15,
+                marketvalue: 1722.90,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-01",
+                ticker: "SNOW",
+                shares: 0,
+                close: 110.23,
+                totalshares: 15,
+                marketvalue: 1653.45,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-02",
+                ticker: "SNOW",
+                shares: 0,
+                close: 109.65,
+                totalshares: 15,
+                marketvalue: 1644.75,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-03",
+                ticker: "SNOW",
+                shares: 0,
+                close: 110.47,
+                totalshares: 15,
+                marketvalue: 1657.05,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-04",
+                ticker: "SNOW",
+                shares: 0,
+                close: 114.72,
+                totalshares: 15,
+                marketvalue: 1720.80,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-07",
+                ticker: "SNOW",
+                shares: 0,
+                close: 113.82,
+                totalshares: 15,
+                marketvalue: 1707.30,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-08",
+                ticker: "SNOW",
+                shares: 0,
+                close: 113.52,
+                totalshares: 15,
+                marketvalue: 1702.80,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-09",
+                ticker: "SNOW",
+                shares: 0,
+                close: 119.67,
+                totalshares: 15,
+                marketvalue: 1795.05,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-10",
+                ticker: "SNOW",
+                shares: 0,
+                close: 123.79,
+                totalshares: 15,
+                marketvalue: 1856.85,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-11",
+                ticker: "SNOW",
+                shares: 0,
+                close: 124.03,
+                totalshares: 15,
+                marketvalue: 1860.45,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-14",
+                ticker: "SNOW",
+                shares: 0,
+                close: 123.16,
+                totalshares: 15,
+                marketvalue: 1847.40,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-15",
+                ticker: "SNOW",
+                shares: 0,
+                close: 122.74,
+                totalshares: 15,
+                marketvalue: 1841.10,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-16",
+                ticker: "SNOW",
+                shares: 0,
+                close: 118.90,
+                totalshares: 15,
+                marketvalue: 1783.50,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-17",
+                ticker: "SNOW",
+                shares: 0,
+                close: 119.03,
+                totalshares: 15,
+                marketvalue: 1785.45,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-18",
+                ticker: "SNOW",
+                shares: 0,
+                close: 119.54,
+                totalshares: 15,
+                marketvalue: 1793.10,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-21",
+                ticker: "SNOW",
+                shares: 0,
+                close: 119.56,
+                totalshares: 15,
+                marketvalue: 1793.40,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-22",
+                ticker: "SNOW",
+                shares: 0,
+                close: 115.50,
+                totalshares: 15,
+                marketvalue: 1732.50,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-23",
+                ticker: "SNOW",
+                shares: 0,
+                close: 113.61,
+                totalshares: 15,
+                marketvalue: 1704.15,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-24",
+                ticker: "SNOW",
+                shares: 0,
+                close: 114.92,
+                totalshares: 15,
+                marketvalue: 1723.80,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-25",
+                ticker: "SNOW",
+                shares: 0,
+                close: 116.04,
+                totalshares: 15,
+                marketvalue: 1740.60,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-28",
+                ticker: "SNOW",
+                shares: 0,
+                close: 117.33,
+                totalshares: 15,
+                marketvalue: 1759.95,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-29",
+                ticker: "SNOW",
+                shares: 0,
+                close: 118.39,
+                totalshares: 15,
+                marketvalue: 1775.85,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-30",
+                ticker: "SNOW",
+                shares: 0,
+                close: 118.99,
+                totalshares: 15,
+                marketvalue: 1784.85,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-10-31",
+                ticker: "SNOW",
+                shares: 0,
+                close: 114.82,
+                totalshares: 15,
+                marketvalue: 1722.30,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-11-01",
+                ticker: "SNOW",
+                shares: 0,
+                close: 115.49,
+                totalshares: 15,
+                marketvalue: 1732.35,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-11-04",
+                ticker: "SNOW",
+                shares: 0,
+                close: 113.74,
+                totalshares: 15,
+                marketvalue: 1706.10,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-11-05",
+                ticker: "SNOW",
+                shares: 0,
+                close: 116.50,
+                totalshares: 15,
+                marketvalue: 1747.50,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-11-06",
+                ticker: "SNOW",
+                shares: 0,
+                close: 121.42,
+                totalshares: 15,
+                marketvalue: 1821.30,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-11-07",
+                ticker: "SNOW",
+                shares: 0,
+                close: 123.54,
+                totalshares: 15,
+                marketvalue: 1853.10,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-11-08",
+                ticker: "SNOW",
+                shares: 0,
+                close: 120.89,
+                totalshares: 15,
+                marketvalue: 1813.35,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-11-11",
+                ticker: "SNOW",
+                shares: 0,
+                close: 123.50,
+                totalshares: 15,
+                marketvalue: 1852.50,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-11-12",
+                ticker: "SNOW",
+                shares: 0,
+                close: 125.46,
+                totalshares: 15,
+                marketvalue: 1881.90,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-11-13",
+                ticker: "SNOW",
+                shares: 0,
+                close: 130.73,
+                totalshares: 15,
+                marketvalue: 1960.95,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-11-14",
+                ticker: "SNOW",
+                shares: 0,
+                close: 129.27,
+                totalshares: 15,
+                marketvalue: 1939.05,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-11-15",
+                ticker: "SNOW",
+                shares: 0,
+                close: 125.96,
+                totalshares: 15,
+                marketvalue: 1889.40,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-11-18",
+                ticker: "SNOW",
+                shares: 0,
+                close: 127.43,
+                totalshares: 15,
+                marketvalue: 1911.45,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-11-19",
+                ticker: "SNOW",
+                shares: 0,
+                close: 130.24,
+                totalshares: 15,
+                marketvalue: 1953.60,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-11-20",
+                ticker: "SNOW",
+                shares: 0,
+                close: 129.12,
+                totalshares: 15,
+                marketvalue: 1936.80,
+                cf: 0,
+                transactions_type: "na"
+            },
+            {
+                date: "2024-11-21",
+                ticker: "SNOW",
+                shares: -15,
+                close: 171.35,
+                totalshares: 0,
+                marketvalue: 0.00,
+                cf: 2601.17,
+                transaction_type: "Sell"
+            }
+        ];
+
+
+        /**
+         * Processes the stock data to extract a series of cash flows for IRR calculation.
+         * @param {Array<Object>} data - The array of stock data objects.
+         * @returns {Array<number>} An array of cash flows.
+         */
+        function getCashFlows(data) {
+            if (!data || data.length === 0) {
+                return [];
+            }
+
+            // The first cash flow is the initial market value, as an outflow (negative).
+            const initialInvestment = -data[0].marketvalue;
+
+            const cashFlows = [initialInvestment];
+
+            // Loop through the rest of the data to find intermediate and final cash flows.
+            // We start at the second item (index 1) since we already handled the first.
+            for (let i = 1; i < data.length; i++) {
+                cashFlows.push(data[i].cf);
+            }
+
+            return cashFlows;
+        }
+
+        // Let's generate the cash flows from your data
+        const cashFlows = getCashFlows(stockData);
+
+        console.log("Generated Cash Flows:", cashFlows);
+        // Expected Output: [-1722.9, 0, 0, ..., 0, 2601.17]
     </script>
 
 </body>

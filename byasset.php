@@ -4,8 +4,8 @@ $conn_string = 'postgres://avnadmin:AVNS_3hYJYnbM0v0az16FLB0@pg-28325ccc-daniel-
 $con = pg_connect($conn_string);
 
 $q = $_GET['q'];
-$b = $_GET['beg'];
-$e = $_GET['end'];
+$beg = $_GET['beg'];
+$end = $_GET['end'];
 
 $sql = "-- =================================================================
 -- Final Resilient Query for Contribution to Return
@@ -13,8 +13,8 @@ $sql = "-- =================================================================
 WITH
   date_range AS (
     SELECT
-      '2025-04-01' :: DATE AS period_start,
-      '2025-07-31' :: DATE AS period_end
+      '".$beg."' :: DATE AS period_start,
+      '".$end."' :: DATE AS period_end
   ),
   valid_dates AS (
     SELECT
@@ -31,7 +31,7 @@ WITH
       SUM(tr.shares) AS ending_shares,
       SUM(CASE WHEN tr.transaction_date >= (SELECT period_start FROM valid_dates) AND tr.transaction_date <= (SELECT period_end FROM valid_dates) THEN tr.amount ELSE 0 END) AS net_cash_flow
     FROM transactions_temp tr
-    WHERE tr.acct_num = 592 AND tr.transaction_date <= (SELECT period_end FROM valid_dates)
+    WHERE tr.acct_num = ".$q." AND tr.transaction_date <= (SELECT period_end FROM valid_dates)
     GROUP BY tr.ticker
   ),
   performance_metrics AS (
@@ -76,8 +76,7 @@ FROM
   final_calcs fc
 WHERE
   COALESCE(fc.beginning_market_value, 0) <> 0
-  OR COALESCE(fc.ending_market_value, 0) <> 0
-  OR COALESCE(fc.net_cash_flow, 0) <> 0
+
   AND ticker <> ''
 ORDER BY
   gain_loss DESC;
