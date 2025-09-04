@@ -1,0 +1,728 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <title>Transactions Management</title>
+    <style>
+        body {
+            font-family: "DM Sans", Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 1200px;
+            width: 95vw;
+            margin: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .section h2 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #007BFF;
+            padding-bottom: 10px;
+        }
+        .form-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            min-width: 150px;
+        }
+        .btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        .btn-primary {
+            background-color: #007BFF;
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: #fff;
+        }
+        .btn-success:hover {
+            background-color: #218838;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        .btn-edit {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        .btn-edit:hover {
+            background-color: #e0a800;
+        }
+        .file-upload {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        #transactions-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        #transactions-table th, #transactions-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        #transactions-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+        }
+        #transactions-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .table-container {
+            max-height: 600px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 90%;
+            max-width: 600px;
+            border-radius: 8px;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover {
+            color: black;
+        }
+        .status-message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            display: none;
+        }
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .pagination button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            background: white;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .pagination button:hover {
+            background-color: #f5f5f5;
+        }
+        .pagination button.active {
+            background-color: #007BFF;
+            color: white;
+            border-color: #007BFF;
+        }
+        .search-filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Transactions Management</h1>
+
+        <!-- Upload Section -->
+        <div class="section">
+            <h2>Upload Transactions</h2>
+            <div class="file-upload">
+                <input type="file" id="csvFile" accept=".csv" />
+                <button class="btn btn-primary" onclick="uploadTransactions()">Upload CSV</button>
+                <button class="btn btn-success" onclick="downloadTemplate()">Download CSV Template</button>
+            </div>
+            <p><small>Upload a CSV file with columns: acct_num, transaction_date, ticker, transaction_type, shares, price, amount</small></p>
+        </div>
+
+        <!-- Add New Transaction Section -->
+        <div class="section">
+            <h2>Add New Transaction</h2>
+            <div class="form-container">
+                <div class="form-group">
+                    <label for="newAcctNum">Account Number:</label>
+                    <input type="number" id="newAcctNum" required>
+                </div>
+                <div class="form-group">
+                    <label for="newDate">Date:</label>
+                    <input type="date" id="newDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="newTicker">Ticker:</label>
+                    <input type="text" id="newTicker" required>
+                </div>
+                <div class="form-group">
+                    <label for="newType">Type:</label>
+                    <select id="newType" required>
+                        <option value="">Select Type</option>
+                        <option value="Buy">Buy</option>
+                        <option value="Sell">Sell</option>
+                        <option value="Dividend">Dividend</option>
+                        <option value="MoneyLink Transfer">MoneyLink Transfer</option>
+                        <option value="Interest">Interest</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="newShares">Shares:</label>
+                    <input type="number" id="newShares" step="0.001" required>
+                </div>
+                <div class="form-group">
+                    <label for="newPrice">Price:</label>
+                    <input type="number" id="newPrice" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="newAmount">Amount:</label>
+                    <input type="number" id="newAmount" step="0.01" required>
+                </div>
+                <button class="btn btn-success" onclick="addTransaction()">Add Transaction</button>
+            </div>
+        </div>
+
+        <!-- Search and Filter Section -->
+        <div class="section">
+            <h2>View Transactions</h2>
+            <div class="search-filters">
+                <div class="form-group">
+                    <label for="filterAccount">Account:</label>
+                    <select id="filterAccount">
+                        <option value="">All Accounts</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="filterTicker">Ticker:</label>
+                    <input type="text" id="filterTicker" placeholder="Filter by ticker">
+                </div>
+                <div class="form-group">
+                    <label for="filterType">Type:</label>
+                    <select id="filterType">
+                        <option value="">All Types</option>
+                        <option value="Buy">Buy</option>
+                        <option value="Sell">Sell</option>
+                        <option value="Dividend">Dividend</option>
+                        <option value="MoneyLink Transfer">MoneyLink Transfer</option>
+                        <option value="Interest">Interest</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="filterDateFrom">From Date:</label>
+                    <input type="date" id="filterDateFrom">
+                </div>
+                <div class="form-group">
+                    <label for="filterDateTo">To Date:</label>
+                    <input type="date" id="filterDateTo">
+                </div>
+                <div class="form-group" style="align-self: flex-end;">
+                    <button class="btn btn-primary" onclick="loadTransactions()">Apply Filters</button>
+                    <button class="btn btn-primary" onclick="clearFilters()">Clear Filters</button>
+                </div>
+            </div>
+
+            <div class="status-message" id="statusMessage"></div>
+
+            <div class="table-container">
+                <table id="transactions-table">
+                    <thead>
+                        <tr>
+                            <th>Account</th>
+                            <th>Date</th>
+                            <th>Ticker</th>
+                            <th>Type</th>
+                            <th>Shares</th>
+                            <th>Price</th>
+                            <th>Amount</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="8" style="text-align: center; padding: 20px;">Click "Apply Filters" to load transactions</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </div>
+
+    <!-- Edit Transaction Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeEditModal()">&times;</span>
+            <h2>Edit Transaction</h2>
+            <div class="form-container">
+                <div class="form-group">
+                    <label for="editAcctNum">Account Number:</label>
+                    <input type="number" id="editAcctNum" required>
+                </div>
+                <div class="form-group">
+                    <label for="editDate">Date:</label>
+                    <input type="date" id="editDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="editTicker">Ticker:</label>
+                    <input type="text" id="editTicker" required>
+                </div>
+                <div class="form-group">
+                    <label for="editType">Type:</label>
+                    <select id="editType" required>
+                        <option value="Buy">Buy</option>
+                        <option value="Sell">Sell</option>
+                        <option value="Dividend">Dividend</option>
+                        <option value="MoneyLink Transfer">MoneyLink Transfer</option>
+                        <option value="Interest">Interest</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editShares">Shares:</label>
+                    <input type="number" id="editShares" step="0.001" required>
+                </div>
+                <div class="form-group">
+                    <label for="editPrice">Price:</label>
+                    <input type="number" id="editPrice" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="editAmount">Amount:</label>
+                    <input type="number" id="editAmount" step="0.01" required>
+                </div>
+            </div>
+            <div style="margin-top: 20px;">
+                <button class="btn btn-success" onclick="saveTransaction()">Save Changes</button>
+                <button class="btn btn-primary" onclick="closeEditModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        const pageSize = 50;
+        let totalTransactions = 0;
+        let currentEditId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAccounts();
+        });
+
+        async function loadAccounts() {
+            try {
+                const response = await fetch('scripts/loadaccounts.php');
+                const accounts = await response.json();
+                const selectElement = document.getElementById('filterAccount');
+                selectElement.innerHTML = '<option value="">All Accounts</option>';
+                accounts.forEach(account => {
+                    const option = document.createElement('option');
+                    option.value = account.acct_num;
+                    option.textContent = account.acct_num;
+                    selectElement.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading accounts:', error);
+            }
+        }
+
+        async function loadTransactions() {
+            showStatus('Loading transactions...', 'success');
+            
+            const filters = {
+                account: document.getElementById('filterAccount').value,
+                ticker: document.getElementById('filterTicker').value,
+                type: document.getElementById('filterType').value,
+                dateFrom: document.getElementById('filterDateFrom').value,
+                dateTo: document.getElementById('filterDateTo').value,
+                page: currentPage,
+                pageSize: pageSize
+            };
+
+            try {
+                const params = new URLSearchParams();
+                Object.keys(filters).forEach(key => {
+                    if (filters[key]) params.append(key, filters[key]);
+                });
+
+                const response = await fetch(`scripts/transactions_api.php?${params}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    showStatus(data.error, 'error');
+                    return;
+                }
+
+                displayTransactions(data.transactions);
+                totalTransactions = data.total;
+                updatePagination();
+                showStatus(`Loaded ${data.transactions.length} of ${totalTransactions} transactions`, 'success');
+            } catch (error) {
+                console.error('Error loading transactions:', error);
+                showStatus('Error loading transactions', 'error');
+            }
+        }
+
+        function displayTransactions(transactions) {
+            const tbody = document.querySelector('#transactions-table tbody');
+            
+            if (transactions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px;">No transactions found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = transactions.map(transaction => `
+                <tr>
+                    <td>${transaction.acct_num}</td>
+                    <td>${transaction.transaction_date}</td>
+                    <td>${transaction.ticker}</td>
+                    <td>${transaction.transaction_type}</td>
+                    <td>${parseFloat(transaction.shares).toFixed(3)}</td>
+                    <td>$${parseFloat(transaction.price).toFixed(2)}</td>
+                    <td>$${parseFloat(transaction.amount).toFixed(2)}</td>
+                    <td>
+                        <button class="btn btn-edit" onclick="editTransaction('${transaction.id}')">Edit</button>
+                        <button class="btn btn-danger" onclick="deleteTransaction('${transaction.id}')">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function updatePagination() {
+            const totalPages = Math.ceil(totalTransactions / pageSize);
+            const paginationElement = document.getElementById('pagination');
+            
+            if (totalPages <= 1) {
+                paginationElement.innerHTML = '';
+                return;
+            }
+
+            let paginationHTML = '';
+            
+            // Previous button
+            if (currentPage > 1) {
+                paginationHTML += `<button onclick="changePage(${currentPage - 1})">Previous</button>`;
+            }
+
+            // Page numbers
+            const startPage = Math.max(1, currentPage - 2);
+            const endPage = Math.min(totalPages, currentPage + 2);
+
+            for (let i = startPage; i <= endPage; i++) {
+                paginationHTML += `<button class="${i === currentPage ? 'active' : ''}" onclick="changePage(${i})">${i}</button>`;
+            }
+
+            // Next button
+            if (currentPage < totalPages) {
+                paginationHTML += `<button onclick="changePage(${currentPage + 1})">Next</button>`;
+            }
+
+            paginationElement.innerHTML = paginationHTML;
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            loadTransactions();
+        }
+
+        async function addTransaction() {
+            const transactionData = {
+                acct_num: document.getElementById('newAcctNum').value,
+                transaction_date: document.getElementById('newDate').value,
+                ticker: document.getElementById('newTicker').value,
+                transaction_type: document.getElementById('newType').value,
+                shares: parseFloat(document.getElementById('newShares').value),
+                price: parseFloat(document.getElementById('newPrice').value),
+                amount: parseFloat(document.getElementById('newAmount').value)
+            };
+
+            // Validate required fields
+            if (!transactionData.acct_num || !transactionData.transaction_date || 
+                !transactionData.ticker || !transactionData.transaction_type) {
+                showStatus('Please fill in all required fields', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('scripts/transactions_api.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(transactionData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showStatus('Transaction added successfully', 'success');
+                    clearNewTransactionForm();
+                    loadTransactions();
+                } else {
+                    showStatus(result.error || 'Error adding transaction', 'error');
+                }
+            } catch (error) {
+                console.error('Error adding transaction:', error);
+                showStatus('Error adding transaction', 'error');
+            }
+        }
+
+        async function editTransaction(id) {
+            try {
+                const response = await fetch(`scripts/transactions_api.php?id=${id}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    showStatus(data.error, 'error');
+                    return;
+                }
+
+                const transaction = data.transaction;
+                currentEditId = id;
+
+                document.getElementById('editAcctNum').value = transaction.acct_num;
+                document.getElementById('editDate').value = transaction.transaction_date;
+                document.getElementById('editTicker').value = transaction.ticker;
+                document.getElementById('editType').value = transaction.transaction_type;
+                document.getElementById('editShares').value = transaction.shares;
+                document.getElementById('editPrice').value = transaction.price;
+                document.getElementById('editAmount').value = transaction.amount;
+
+                document.getElementById('editModal').style.display = 'block';
+            } catch (error) {
+                console.error('Error loading transaction for edit:', error);
+                showStatus('Error loading transaction', 'error');
+            }
+        }
+
+        async function saveTransaction() {
+            const transactionData = {
+                id: currentEditId,
+                acct_num: document.getElementById('editAcctNum').value,
+                transaction_date: document.getElementById('editDate').value,
+                ticker: document.getElementById('editTicker').value,
+                transaction_type: document.getElementById('editType').value,
+                shares: parseFloat(document.getElementById('editShares').value),
+                price: parseFloat(document.getElementById('editPrice').value),
+                amount: parseFloat(document.getElementById('editAmount').value)
+            };
+
+            try {
+                const response = await fetch('scripts/transactions_api.php', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(transactionData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showStatus('Transaction updated successfully', 'success');
+                    closeEditModal();
+                    loadTransactions();
+                } else {
+                    showStatus(result.error || 'Error updating transaction', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating transaction:', error);
+                showStatus('Error updating transaction', 'error');
+            }
+        }
+
+        async function deleteTransaction(id) {
+            if (!confirm('Are you sure you want to delete this transaction?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('scripts/transactions_api.php', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ id: id })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showStatus('Transaction deleted successfully', 'success');
+                    loadTransactions();
+                } else {
+                    showStatus(result.error || 'Error deleting transaction', 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting transaction:', error);
+                showStatus('Error deleting transaction', 'error');
+            }
+        }
+
+        async function uploadTransactions() {
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                showStatus('Please select a CSV file', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('csv', file);
+
+            try {
+                showStatus('Uploading transactions...', 'success');
+                
+                const response = await fetch('scripts/transactions_upload.php', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showStatus(`Successfully uploaded ${result.count} transactions`, 'success');
+                    fileInput.value = '';
+                    loadTransactions();
+                } else {
+                    showStatus(result.error || 'Error uploading transactions', 'error');
+                }
+            } catch (error) {
+                console.error('Error uploading transactions:', error);
+                showStatus('Error uploading transactions', 'error');
+            }
+        }
+
+        function downloadTemplate() {
+            const csvContent = 'acct_num,transaction_date,ticker,transaction_type,shares,price,amount\n' +
+                              '12345,2024-01-15,AAPL,Buy,10,150.00,1500.00\n' +
+                              '12345,2024-01-20,MSFT,Buy,5,400.00,2000.00';
+            
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'transaction_template.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+            currentEditId = null;
+        }
+
+        function clearNewTransactionForm() {
+            document.getElementById('newAcctNum').value = '';
+            document.getElementById('newDate').value = '';
+            document.getElementById('newTicker').value = '';
+            document.getElementById('newType').value = '';
+            document.getElementById('newShares').value = '';
+            document.getElementById('newPrice').value = '';
+            document.getElementById('newAmount').value = '';
+        }
+
+        function clearFilters() {
+            document.getElementById('filterAccount').value = '';
+            document.getElementById('filterTicker').value = '';
+            document.getElementById('filterType').value = '';
+            document.getElementById('filterDateFrom').value = '';
+            document.getElementById('filterDateTo').value = '';
+            currentPage = 1;
+        }
+
+        function showStatus(message, type) {
+            const statusElement = document.getElementById('statusMessage');
+            statusElement.textContent = message;
+            statusElement.className = `status-message status-${type}`;
+            statusElement.style.display = 'block';
+            
+            setTimeout(() => {
+                statusElement.style.display = 'none';
+            }, 5000);
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('editModal');
+            if (event.target === modal) {
+                closeEditModal();
+            }
+        }
+    </script>
+
+</body>
+</html>
