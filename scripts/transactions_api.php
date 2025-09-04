@@ -77,6 +77,12 @@ function handleGet($con) {
     // Get total count
     $countQuery = "SELECT COUNT(*) as total FROM transactions_temp $whereClause";
     $countResult = pg_query_params($con, $countQuery, $params);
+    
+    if (!$countResult) {
+        echo json_encode(['error' => 'Database query failed: ' . pg_last_error($con)]);
+        return;
+    }
+    
     $totalRow = pg_fetch_assoc($countResult);
     $total = $totalRow['total'];
 
@@ -94,6 +100,12 @@ function handleGet($con) {
     $params[] = $offset;
 
     $result = pg_query_params($con, $query, $params);
+    
+    if (!$result) {
+        echo json_encode(['error' => 'Database query failed: ' . pg_last_error($con)]);
+        return;
+    }
+    
     $transactions = array();
     
     while ($row = pg_fetch_assoc($result)) {
