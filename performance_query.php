@@ -3,18 +3,35 @@
 $conn_string = 'postgres://avnadmin:AVNS_3hYJYnbM0v0az16FLB0@pg-28325ccc-daniel-0eca.a.aivencloud.com:26974/defaultdb?sslmode=require';
 $con = pg_connect($conn_string);
 
-// Get acct_num from query parameter
+// Get acct_num, start_date, and end_date from query parameters
 $acct_num = $_GET['acct_num'];
-//$acct_num = 800;
+$start_date = isset($_GET['start_date']) ? $_GET['start_date'] : null;
+$end_date = isset($_GET['end_date']) ? $_GET['end_date'] : null;
+
+// Build date conditions
+$date_condition_tr = "";
+$date_condition_pr = "";
+$min_date_query = "(SELECT MIN(transaction_date) FROM transactions_temp WHERE acct_num = ".$acct_num.")";
+
+if ($start_date) {
+    $date_condition_tr = " AND transaction_date >= '".$start_date."'";
+    $date_condition_pr = " AND date >= '".$start_date."'";
+    $min_date_query = "'".$start_date."'";
+}
+
+if ($end_date) {
+    $date_condition_tr .= " AND transaction_date <= '".$end_date."'";
+    $date_condition_pr .= " AND date <= '".$end_date."'";
+}
 
 $sql = "WITH tr AS ( 
-    SELECT * FROM transactions_temp WHERE acct_num = ".$acct_num."
+    SELECT * FROM transactions_temp WHERE acct_num = ".$acct_num.$date_condition_tr."
 ),
 pr AS (
     SELECT date, ticker, close 
     FROM prices_stocks
     WHERE ticker IN (SELECT DISTINCT ticker FROM transactions_temp WHERE acct_num = ".$acct_num.")
-    AND date >= (SELECT MIN(transaction_date) FROM transactions_temp WHERE acct_num = ".$acct_num.")
+    AND date >= ".$min_date_query.$date_condition_pr."
 ),
 mktvalues AS (
     SELECT
@@ -36,7 +53,7 @@ cash_flows AS (
         transaction_date,
         SUM(amount) AS total_cf,
         SUM(CASE WHEN transaction_type = 'MoneyLink Transfer' THEN amount ELSE 0 END) AS contr_distr
-    FROM transactions_temp WHERE acct_num = ".$acct_num."
+    FROM transactions_temp WHERE acct_num = ".$acct_num.$date_condition_tr."
     GROUP BY transaction_date
     ORDER BY transaction_date
 ), twr AS (
@@ -76,4 +93,3 @@ while ($row = pg_fetch_assoc($result)) {
 
 header('Content-Type: application/json');
 echo json_encode($returnArr, JSON_NUMERIC_CHECK);
-
