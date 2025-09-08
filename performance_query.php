@@ -5,6 +5,8 @@ $con = pg_connect($conn_string);
 
 // Get acct_num from query parameter
 $acct_num = $_GET['acct_num'];
+$start_date = $_GET['start_date'];
+$end_date = $_GET['end_date'];
 //$acct_num = 800;
 
 $sql = "WITH tr AS ( 
@@ -57,7 +59,8 @@ SELECT date, dailyval, total_cf, cash_balance, (dailyval + cash_balance) AS tota
 ( (dailyval + cash_balance) / ( LAG(dailyval, 1) OVER (ORDER BY date) + LAG(cash_balance, 1) OVER (ORDER BY date) + external_cf) ) AS factor,
 ( (dailyval + cash_balance) / ( LAG(dailyval, 1) OVER (ORDER BY date) + LAG(cash_balance, 1) OVER (ORDER BY date) + external_cf) ) -1 AS pct_return
 FROM twr
-";
+WHERE date >= '".$start_date."' AND date <= '".$end_date.
+";";
 
 $result = pg_query($con, $sql);
 
