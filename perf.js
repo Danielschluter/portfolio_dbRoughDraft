@@ -10,9 +10,6 @@ function loadPerformanceData(accountNum) {
         return;
     }
 
-    // Load inception date for selected account
-    loadInceptionDateForAccount(accountNum);
-
     // Clear previous data
     document.querySelector('.tbl-container').style.display = 'none';
     document.getElementById('chart-container').style.display = 'none';
