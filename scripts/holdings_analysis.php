@@ -1,3 +1,4 @@
+
 <?php
 header('Content-Type: application/json');
 
@@ -21,194 +22,157 @@ if (!$acct_num) {
 $sql = "WITH transactions_filtered AS (
     SELECT * FROM transactions_temp 
     WHERE acct_num = $1
-    " . ($start_date ? "AND transaction_date >= '$start_date'" : "") . "
-    " . ($end_date ? "AND transaction_date <= '$end_date'" : "") . "
 ),
 
+-- Get price data for the full range
 price_data AS (
     SELECT 
         ticker,
         date,
-        close,
-        LAG(close) OVER (PARTITION BY ticker ORDER BY date) as prev_close
+        close
     FROM prices_stocks
     WHERE ticker IN (SELECT DISTINCT ticker FROM transactions_filtered)
-    " . ($start_date ? "AND date >= '$start_date'" : "") . "
-    " . ($end_date ? "AND date <= '$end_date'" : "") . "
+    AND ticker != 'CASHX'
 ),
 
+-- Calculate cumulative shares over time
 holdings_timeline AS (
     SELECT 
         p.ticker,
         p.date,
         p.close,
-        p.prev_close,
         COALESCE(SUM(t.shares) OVER (
             PARTITION BY p.ticker 
             ORDER BY p.date 
             ROWS UNBOUNDED PRECEDING
-        ), 0) as cumulative_shares,
-        CASE WHEN p.prev_close IS NOT NULL AND p.prev_close > 0 
-             THEN (p.close - p.prev_close) / p.prev_close 
-             ELSE 0 END as daily_return
+        ), 0) as cumulative_shares
     FROM price_data p
     LEFT JOIN transactions_filtered t ON p.ticker = t.ticker AND p.date = t.transaction_date
-    WHERE p.ticker != 'CASHX'
 ),
 
-position_metrics AS (
+-- Find holdings within the specified period
+period_holdings AS (
     SELECT 
         ticker,
-        COUNT(*) as days_held,
+        date,
+        close,
+        cumulative_shares,
+        cumulative_shares * close as market_value
+    FROM holdings_timeline
+    WHERE date >= COALESCE('$start_date', '1900-01-01')::date
+    AND date <= COALESCE('$end_date', '2099-12-31')::date
+    AND cumulative_shares > 0
+),
+
+-- Get first and last dates for each ticker in the period
+holding_dates AS (
+    SELECT 
+        ticker,
         MIN(date) as first_date,
-        MAX(date) as last_date,
-        AVG(cumulative_shares * close) as avg_position_value,
-        MAX(cumulative_shares * close) as max_position_value,
-        MIN(CASE WHEN cumulative_shares > 0 THEN cumulative_shares * close END) as min_position_value,
-        STDDEV(cumulative_shares * close) as position_volatility,
-        SUM(CASE WHEN cumulative_shares > 0 THEN 1 ELSE 0 END) as days_with_position
-    FROM holdings_timeline
-    WHERE cumulative_shares > 0
+        MAX(date) as last_date
+    FROM period_holdings
     GROUP BY ticker
 ),
 
-price_endpoints AS (
-    SELECT 
-        ticker,
-        FIRST_VALUE(close) OVER (PARTITION BY ticker ORDER BY date) as start_price,
-        LAST_VALUE(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) as end_price
-    FROM holdings_timeline
-    WHERE cumulative_shares > 0
-),
-
-price_summary AS (
-    SELECT 
-        ticker,
-        MIN(start_price) as start_price,
-        MAX(end_price) as end_price
-    FROM price_endpoints
-    GROUP BY ticker
-),
-
--- Calculate price endpoints for each ticker using simple aggregation
-price_endpoints_summary AS (
-    SELECT 
-        ticker,
-        MIN(date) as start_date,
-        MAX(date) as end_date
-    FROM holdings_timeline
-    WHERE cumulative_shares > 0
-    GROUP BY ticker
-),
-
--- Get actual start and end prices
-start_prices AS (
+-- Get starting positions and prices
+starting_positions AS (
     SELECT DISTINCT
         h.ticker,
-        FIRST_VALUE(h.close) OVER (PARTITION BY h.ticker ORDER BY h.date) as start_price
-    FROM holdings_timeline h
-    JOIN price_endpoints_summary pe ON h.ticker = pe.ticker AND h.date = pe.start_date
-    WHERE h.cumulative_shares > 0
+        h.first_date,
+        FIRST_VALUE(h.cumulative_shares) OVER (PARTITION BY h.ticker ORDER BY h.date) as starting_shares,
+        FIRST_VALUE(h.close) OVER (PARTITION BY h.ticker ORDER BY h.date) as starting_price,
+        FIRST_VALUE(h.market_value) OVER (PARTITION BY h.ticker ORDER BY h.date) as starting_value
+    FROM period_holdings h
+    JOIN holding_dates hd ON h.ticker = hd.ticker AND h.date = hd.first_date
 ),
 
-end_prices AS (
+-- Get ending positions and prices  
+ending_positions AS (
     SELECT DISTINCT
         h.ticker,
-        FIRST_VALUE(h.close) OVER (PARTITION BY h.ticker ORDER BY h.date DESC) as end_price
-    FROM holdings_timeline h
-    JOIN price_endpoints_summary pe ON h.ticker = pe.ticker AND h.date = pe.end_date
-    WHERE h.cumulative_shares > 0
+        h.last_date,
+        FIRST_VALUE(h.cumulative_shares) OVER (PARTITION BY h.ticker ORDER BY h.date DESC) as ending_shares,
+        FIRST_VALUE(h.close) OVER (PARTITION BY h.ticker ORDER BY h.date DESC) as ending_price,
+        FIRST_VALUE(h.market_value) OVER (PARTITION BY h.ticker ORDER BY h.date DESC) as ending_value
+    FROM period_holdings h
+    JOIN holding_dates hd ON h.ticker = hd.ticker AND h.date = hd.last_date
 ),
 
-performance_stats AS (
+-- Calculate transactions within period
+period_transactions AS (
     SELECT 
         ticker,
-        -- Basic statistics from grouped data
-        STDDEV(daily_return) * SQRT(252) as annualized_volatility,
-        COUNT(CASE WHEN daily_return > 0 THEN 1 END) * 1.0 / COUNT(*) as win_rate,
-        MAX(daily_return) as best_day,
-        MIN(daily_return) as worst_day,
-        COUNT(DISTINCT date) as trading_days
-    FROM holdings_timeline
-    WHERE cumulative_shares > 0
-    GROUP BY ticker
-),
-
-performance_summary AS (
-    SELECT 
-        ps.ticker,
-        -- Calculate returns using price endpoints
-        (ep.end_price / sp.start_price - 1) as total_return,
-        -- Annualized return based on actual holding period
-        CASE WHEN pe.end_date > pe.start_date 
-             THEN POWER(ep.end_price / sp.start_price, 365.0 / (pe.end_date - pe.start_date)) - 1
-             ELSE 0 END as annualized_return,
-        ps.annualized_volatility,
-        ps.win_rate,
-        ps.best_day,
-        ps.worst_day,
-        ps.trading_days,
-        sp.start_price,
-        ep.end_price
-    FROM performance_stats ps
-    JOIN price_endpoints_summary pe ON ps.ticker = pe.ticker
-    JOIN start_prices sp ON ps.ticker = sp.ticker
-    JOIN end_prices ep ON ps.ticker = ep.ticker
-),
-
-transaction_analysis AS (
-    SELECT 
-        ticker,
-        COUNT(*) as total_transactions,
-        SUM(CASE WHEN shares > 0 THEN shares ELSE 0 END) as total_bought,
-        SUM(CASE WHEN shares < 0 THEN ABS(shares) ELSE 0 END) as total_sold,
-        SUM(CASE WHEN shares > 0 THEN amount ELSE 0 END) as total_invested,
-        SUM(CASE WHEN shares < 0 THEN ABS(amount) ELSE 0 END) as total_proceeds,
+        COUNT(*) as transactions_in_period,
+        SUM(CASE WHEN shares > 0 THEN shares ELSE 0 END) as shares_bought,
+        SUM(CASE WHEN shares < 0 THEN ABS(shares) ELSE 0 END) as shares_sold,
+        SUM(CASE WHEN shares > 0 THEN amount ELSE 0 END) as amount_invested,
+        SUM(CASE WHEN shares < 0 THEN ABS(amount) ELSE 0 END) as amount_received,
         AVG(CASE WHEN shares > 0 THEN price END) as avg_buy_price,
         AVG(CASE WHEN shares < 0 THEN price END) as avg_sell_price
     FROM transactions_filtered
     WHERE ticker != 'CASHX'
+    AND transaction_date >= COALESCE('$start_date', '1900-01-01')::date
+    AND transaction_date <= COALESCE('$end_date', '2099-12-31')::date
+    GROUP BY ticker
+),
+
+-- Get total days held in period
+days_held AS (
+    SELECT 
+        ticker,
+        COUNT(DISTINCT date) as days_held_in_period
+    FROM period_holdings
     GROUP BY ticker
 )
 
 SELECT 
-    pm.ticker,
-    pm.days_held,
-    pm.first_date,
-    pm.last_date,
-    pm.avg_position_value,
-    pm.max_position_value,
-    pm.min_position_value,
-    pm.position_volatility,
-    ps.start_price,
-    ps.end_price,
-    (ps.end_price / ps.start_price - 1) * 100 as price_return_pct,
-    ps.total_return * 100 as total_return_pct,
-    ps.annualized_return * 100 as annualized_return_pct,
-    ps.annualized_volatility * 100 as annualized_volatility_pct,
-    ps.win_rate * 100 as win_rate_pct,
-    ps.best_day * 100 as best_day_pct,
-    ps.worst_day * 100 as worst_day_pct,
-    ps.trading_days,
-    CASE WHEN ps.annualized_volatility > 0 
-         THEN ps.annualized_return / ps.annualized_volatility 
-         ELSE 0 END as sharpe_ratio,
-    ta.total_transactions,
-    ta.total_bought,
-    ta.total_sold,
-    ta.total_invested,
-    ta.total_proceeds,
-    ta.avg_buy_price,
-    ta.avg_sell_price,
-    CASE WHEN ta.avg_buy_price > 0 AND ta.avg_sell_price > 0
-         THEN (ta.avg_sell_price / ta.avg_buy_price - 1) * 100
-         ELSE NULL END as trading_profit_pct,
-    ta.total_proceeds - ta.total_invested as realized_pnl
-FROM position_metrics pm
-LEFT JOIN performance_summary ps ON pm.ticker = ps.ticker
-LEFT JOIN transaction_analysis ta ON pm.ticker = ta.ticker
-WHERE pm.days_with_position > 0
-ORDER BY pm.avg_position_value DESC";
+    sp.ticker,
+    sp.first_date,
+    ep.last_date,
+    dh.days_held_in_period,
+    sp.starting_shares,
+    sp.starting_price,
+    sp.starting_value,
+    ep.ending_shares,
+    ep.ending_price,
+    ep.ending_value,
+    
+    -- Change calculations
+    (ep.ending_shares - sp.starting_shares) as shares_change,
+    (ep.ending_value - sp.starting_value) as market_value_change,
+    CASE WHEN sp.starting_value > 0 
+         THEN ((ep.ending_value - sp.starting_value) / sp.starting_value) * 100
+         ELSE 0 END as market_value_change_pct,
+    
+    -- Price performance
+    (ep.ending_price - sp.starting_price) as price_change,
+    CASE WHEN sp.starting_price > 0 
+         THEN ((ep.ending_price - sp.starting_price) / sp.starting_price) * 100
+         ELSE 0 END as price_change_pct,
+    
+    -- Transaction data
+    COALESCE(pt.transactions_in_period, 0) as transactions_in_period,
+    COALESCE(pt.shares_bought, 0) as shares_bought,
+    COALESCE(pt.shares_sold, 0) as shares_sold,
+    COALESCE(pt.amount_invested, 0) as amount_invested,
+    COALESCE(pt.amount_received, 0) as amount_received,
+    COALESCE(pt.avg_buy_price, 0) as avg_buy_price,
+    COALESCE(pt.avg_sell_price, 0) as avg_sell_price,
+    
+    -- Net cash flow and realized P&L
+    COALESCE(pt.amount_received - pt.amount_invested, 0) as net_cash_flow,
+    
+    -- Total return including cash flows
+    (ep.ending_value - sp.starting_value + COALESCE(pt.amount_received - pt.amount_invested, 0)) as total_return,
+    CASE WHEN sp.starting_value > 0 
+         THEN ((ep.ending_value - sp.starting_value + COALESCE(pt.amount_received - pt.amount_invested, 0)) / sp.starting_value) * 100
+         ELSE 0 END as total_return_pct
+
+FROM starting_positions sp
+JOIN ending_positions ep ON sp.ticker = ep.ticker
+JOIN days_held dh ON sp.ticker = dh.ticker
+LEFT JOIN period_transactions pt ON sp.ticker = pt.ticker
+ORDER BY sp.starting_value DESC";
 
 $result = pg_query_params($con, $sql, array($acct_num));
 
