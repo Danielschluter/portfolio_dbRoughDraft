@@ -94,11 +94,12 @@
           <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
             <input type="text" id="holdingsFilter" placeholder="Filter by ticker..." style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; width: 200px;">
             <select id="holdingsSortBy" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
-              <option value="avg_position_value">Sort by Position Size</option>
-              <option value="total_return_pct">Sort by Total Return</option>
-              <option value="annualized_return_pct">Sort by Annualized Return</option>
-              <option value="sharpe_ratio">Sort by Sharpe Ratio</option>
-              <option value="days_held">Sort by Days Held</option>
+              <option value="starting_value">Sort by Starting Value</option>
+              <option value="total_return_pct">Sort by Total Return %</option>
+              <option value="market_value_change_pct">Sort by Market Value Change %</option>
+              <option value="price_change_pct">Sort by Price Change %</option>
+              <option value="days_held_in_period">Sort by Days Held</option>
+              <option value="total_return">Sort by Total Return</option>
             </select>
           </div>
           
@@ -107,15 +108,17 @@
               <thead>
                 <tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
                   <th style="padding: 10px; text-align: left; border: 1px solid #dee2e6; font-weight: 600;">Ticker</th>
-                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Avg Position</th>
-                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Total Return</th>
-                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Ann. Return</th>
-                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Volatility</th>
-                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Sharpe</th>
-                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Win Rate</th>
+                  <th style="padding: 10px; text-align: center; border: 1px solid #dee2e6; font-weight: 600;">First Date</th>
+                  <th style="padding: 10px; text-align: center; border: 1px solid #dee2e6; font-weight: 600;">Last Date</th>
                   <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Days Held</th>
+                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Starting Value</th>
+                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Ending Value</th>
+                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Market Value Change</th>
+                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Price Change %</th>
                   <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Transactions</th>
-                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Realized P&L</th>
+                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Net Cash Flow</th>
+                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Total Return</th>
+                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Total Return %</th>
                 </tr>
               </thead>
               <tbody id="holdingsAnalysisTableBody">
@@ -890,7 +893,7 @@
       const worstPerformer = data.reduce((worst, current) => 
         parseFloat(current.total_return_pct) < parseFloat(worst.total_return_pct) ? current : worst
       );
-      const avgDaysHeld = data.reduce((sum, item) => sum + parseFloat(item.days_held), 0) / data.length;
+      const avgDaysHeld = data.reduce((sum, item) => sum + parseFloat(item.days_held_in_period), 0) / data.length;
 
       document.getElementById('totalHoldings').textContent = totalHoldings;
       document.getElementById('bestPerformer').innerHTML = `${bestPerformer.ticker}<br><span style="font-size: 14px; color: #28a745;">${parseFloat(bestPerformer.total_return_pct).toFixed(1)}%</span>`;
@@ -906,24 +909,25 @@
         const row = document.createElement('tr');
         row.style.borderBottom = '1px solid #dee2e6';
 
-        const totalReturn = parseFloat(holding.total_return_pct) || 0;
-        const annualizedReturn = parseFloat(holding.annualized_return_pct) || 0;
-        const volatility = parseFloat(holding.annualized_volatility_pct) || 0;
-        const sharpe = parseFloat(holding.sharpe_ratio) || 0;
-        const winRate = parseFloat(holding.win_rate_pct) || 0;
-        const realizedPnL = parseFloat(holding.realized_pnl) || 0;
+        const marketValueChangePct = parseFloat(holding.market_value_change_pct) || 0;
+        const priceChangePct = parseFloat(holding.price_change_pct) || 0;
+        const totalReturnPct = parseFloat(holding.total_return_pct) || 0;
+        const totalReturn = parseFloat(holding.total_return) || 0;
+        const netCashFlow = parseFloat(holding.net_cash_flow) || 0;
 
         row.innerHTML = `
           <td style="padding: 8px; border: 1px solid #dee2e6; font-weight: 600;">${holding.ticker}</td>
-          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">${new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD'}).format(parseFloat(holding.avg_position_value))}</td>
-          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right; color: ${totalReturn >= 0 ? '#28a745' : '#dc3545'};">${totalReturn.toFixed(1)}%</td>
-          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right; color: ${annualizedReturn >= 0 ? '#28a745' : '#dc3545'};">${annualizedReturn.toFixed(1)}%</td>
-          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">${volatility.toFixed(1)}%</td>
-          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right; color: ${sharpe >= 0 ? '#28a745' : '#dc3545'};">${sharpe.toFixed(2)}</td>
-          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">${winRate.toFixed(1)}%</td>
-          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">${holding.days_held}</td>
-          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">${holding.total_transactions}</td>
-          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right; color: ${realizedPnL >= 0 ? '#28a745' : '#dc3545'};">${new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD'}).format(realizedPnL)}</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: center;">${holding.first_date}</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: center;">${holding.last_date}</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">${holding.days_held_in_period}</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">${new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD'}).format(parseFloat(holding.starting_value))}</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">${new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD'}).format(parseFloat(holding.ending_value))}</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right; color: ${marketValueChangePct >= 0 ? '#28a745' : '#dc3545'};">${new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD'}).format(parseFloat(holding.market_value_change))}</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right; color: ${priceChangePct >= 0 ? '#28a745' : '#dc3545'};">${priceChangePct.toFixed(1)}%</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">${holding.transactions_in_period}</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right; color: ${netCashFlow >= 0 ? '#28a745' : '#dc3545'};">${new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD'}).format(netCashFlow)}</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right; color: ${totalReturn >= 0 ? '#28a745' : '#dc3545'};">${new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD'}).format(totalReturn)}</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right; color: ${totalReturnPct >= 0 ? '#28a745' : '#dc3545'};">${totalReturnPct.toFixed(1)}%</td>
         `;
         
         tbody.appendChild(row);
