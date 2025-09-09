@@ -66,11 +66,27 @@ position_metrics AS (
         MAX(cumulative_shares * close) as max_position_value,
         MIN(CASE WHEN cumulative_shares > 0 THEN cumulative_shares * close END) as min_position_value,
         STDDEV(cumulative_shares * close) as position_volatility,
-        SUM(CASE WHEN cumulative_shares > 0 THEN 1 ELSE 0 END) as days_with_position,
+        SUM(CASE WHEN cumulative_shares > 0 THEN 1 ELSE 0 END) as days_with_position
+    FROM holdings_timeline
+    WHERE cumulative_shares > 0
+    GROUP BY ticker
+),
+
+price_endpoints AS (
+    SELECT 
+        ticker,
         FIRST_VALUE(close) OVER (PARTITION BY ticker ORDER BY date) as start_price,
         LAST_VALUE(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) as end_price
     FROM holdings_timeline
     WHERE cumulative_shares > 0
+),
+
+price_summary AS (
+    SELECT 
+        ticker,
+        MIN(start_price) as start_price,
+        MAX(end_price) as end_price
+    FROM price_endpoints
     GROUP BY ticker
 ),
 
@@ -112,9 +128,9 @@ SELECT
     pm.max_position_value,
     pm.min_position_value,
     pm.position_volatility,
-    pm.start_price,
-    pm.end_price,
-    (pm.end_price / pm.start_price - 1) * 100 as price_return_pct,
+    prs.start_price,
+    prs.end_price,
+    (prs.end_price / prs.start_price - 1) * 100 as price_return_pct,
     ps.annualized_return * 100 as annualized_return_pct,
     ps.annualized_volatility * 100 as annualized_volatility_pct,
     ps.total_return * 100 as total_return_pct,
@@ -138,6 +154,7 @@ SELECT
 FROM position_metrics pm
 LEFT JOIN performance_stats ps ON pm.ticker = ps.ticker
 LEFT JOIN transaction_analysis ta ON pm.ticker = ta.ticker
+LEFT JOIN price_summary prs ON pm.ticker = prs.ticker
 WHERE pm.days_with_position > 0
 ORDER BY pm.avg_position_value DESC";
 
