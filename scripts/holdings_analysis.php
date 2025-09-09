@@ -93,15 +93,38 @@ price_summary AS (
 performance_stats AS (
     SELECT 
         ticker,
-        AVG(daily_return) * 252 as annualized_return,
+        -- Calculate proper holding period return using first/last holding dates
+        (LAST_VALUE(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) / 
+         FIRST_VALUE(close) OVER (PARTITION BY ticker ORDER BY date) - 1) as holding_period_return,
+        -- Annualized return based on holding period
+        POWER(LAST_VALUE(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) / 
+              FIRST_VALUE(close) OVER (PARTITION BY ticker ORDER BY date), 
+              365.0 / GREATEST(1, MAX(date) OVER (PARTITION BY ticker) - MIN(date) OVER (PARTITION BY ticker))) - 1 as annualized_return,
+        -- Volatility based on daily returns
         STDDEV(daily_return) * SQRT(252) as annualized_volatility,
-        (MAX(close) - MIN(close)) / MIN(close) as total_return,
+        -- Win rate
         COUNT(CASE WHEN daily_return > 0 THEN 1 END) * 1.0 / COUNT(*) as win_rate,
         MAX(daily_return) as best_day,
-        MIN(daily_return) as worst_day
+        MIN(daily_return) as worst_day,
+        -- Days held for reference
+        COUNT(DISTINCT date) as trading_days
     FROM holdings_timeline
     WHERE cumulative_shares > 0
     GROUP BY ticker
+),
+
+-- Separate CTE to get unique holding period returns per ticker
+performance_summary AS (
+    SELECT DISTINCT
+        ticker,
+        FIRST_VALUE(holding_period_return) OVER (PARTITION BY ticker) as total_return,
+        FIRST_VALUE(annualized_return) OVER (PARTITION BY ticker) as annualized_return,
+        FIRST_VALUE(annualized_volatility) OVER (PARTITION BY ticker) as annualized_volatility,
+        FIRST_VALUE(win_rate) OVER (PARTITION BY ticker) as win_rate,
+        FIRST_VALUE(best_day) OVER (PARTITION BY ticker) as best_day,
+        FIRST_VALUE(worst_day) OVER (PARTITION BY ticker) as worst_day,
+        FIRST_VALUE(trading_days) OVER (PARTITION BY ticker) as trading_days
+    FROM performance_stats
 ),
 
 transaction_analysis AS (
@@ -131,12 +154,13 @@ SELECT
     prs.start_price,
     prs.end_price,
     (prs.end_price / prs.start_price - 1) * 100 as price_return_pct,
+    ps.total_return * 100 as total_return_pct,
     ps.annualized_return * 100 as annualized_return_pct,
     ps.annualized_volatility * 100 as annualized_volatility_pct,
-    ps.total_return * 100 as total_return_pct,
     ps.win_rate * 100 as win_rate_pct,
     ps.best_day * 100 as best_day_pct,
     ps.worst_day * 100 as worst_day_pct,
+    ps.trading_days,
     CASE WHEN ps.annualized_volatility > 0 
          THEN ps.annualized_return / ps.annualized_volatility 
          ELSE 0 END as sharpe_ratio,
@@ -152,7 +176,7 @@ SELECT
          ELSE NULL END as trading_profit_pct,
     ta.total_proceeds - ta.total_invested as realized_pnl
 FROM position_metrics pm
-LEFT JOIN performance_stats ps ON pm.ticker = ps.ticker
+LEFT JOIN performance_summary ps ON pm.ticker = ps.ticker
 LEFT JOIN transaction_analysis ta ON pm.ticker = ta.ticker
 LEFT JOIN price_summary prs ON pm.ticker = prs.ticker
 WHERE pm.days_with_position > 0
