@@ -53,6 +53,80 @@
     <div id="performance-chart" style="width: 100%; height: 400px;"></div>
   </div>
 
+  <!-- Holdings Analysis Deep Dive Section -->
+  <div id="holdings-analysis-container" style="display: none; margin-bottom: 20px;">
+    <div style="background: white; border-radius: var(--border-radius); padding: var(--space-4); box-shadow: var(--shadow-sm); border: 1px solid var(--gray-200);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin: 0; color: #333;">Holdings Analysis Deep Dive</h2>
+        <button id="toggleHoldingsAnalysis" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+          Show Analysis
+        </button>
+      </div>
+      
+      <div id="holdings-analysis-content" style="display: none;">
+        <div id="holdings-loading" style="text-align: center; padding: 20px; color: #666;">Loading holdings analysis...</div>
+        <div id="holdings-error" style="display: none; text-align: center; padding: 20px; color: #d32f2f; background-color: #ffebee; border-radius: 4px;">Error loading holdings analysis</div>
+        
+        <!-- Summary Cards -->
+        <div id="holdings-summary" style="display: none; margin-bottom: 30px;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+            <div class="metric-card" style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: #007bff;" id="totalHoldings">-</div>
+              <div style="color: #666; font-size: 14px;">Total Holdings</div>
+            </div>
+            <div class="metric-card" style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: #28a745;" id="bestPerformer">-</div>
+              <div style="color: #666; font-size: 14px;">Best Performer</div>
+            </div>
+            <div class="metric-card" style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: #dc3545;" id="worstPerformer">-</div>
+              <div style="color: #666; font-size: 14px;">Worst Performer</div>
+            </div>
+            <div class="metric-card" style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: #6f42c1;" id="avgHoldingPeriod">-</div>
+              <div style="color: #666; font-size: 14px;">Avg Days Held</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Holdings Analysis Table -->
+        <div id="holdings-analysis-table" style="display: none;">
+          <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
+            <input type="text" id="holdingsFilter" placeholder="Filter by ticker..." style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; width: 200px;">
+            <select id="holdingsSortBy" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+              <option value="avg_position_value">Sort by Position Size</option>
+              <option value="total_return_pct">Sort by Total Return</option>
+              <option value="annualized_return_pct">Sort by Annualized Return</option>
+              <option value="sharpe_ratio">Sort by Sharpe Ratio</option>
+              <option value="days_held">Sort by Days Held</option>
+            </select>
+          </div>
+          
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-family: 'Inter', sans-serif; font-size: 14px;">
+              <thead>
+                <tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                  <th style="padding: 10px; text-align: left; border: 1px solid #dee2e6; font-weight: 600;">Ticker</th>
+                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Avg Position</th>
+                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Total Return</th>
+                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Ann. Return</th>
+                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Volatility</th>
+                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Sharpe</th>
+                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Win Rate</th>
+                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Days Held</th>
+                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Transactions</th>
+                  <th style="padding: 10px; text-align: right; border: 1px solid #dee2e6; font-weight: 600;">Realized P&L</th>
+                </tr>
+              </thead>
+              <tbody id="holdingsAnalysisTableBody">
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="tbl-container" style="display: none;">
     <div class="header-row" id="dynamicHeader"></div>
     <div class="virtual-scroll-content"></div>
@@ -598,11 +672,15 @@
           
           // Store current account for use in date cell clicks
           window.currentAccount = accountNum;
+          window.holdingsAnalysisLoaded = false;
 
           if (data && data.length > 0) {
             // Create and show chart
             createChart(data);
             document.getElementById('chart-container').style.display = 'block';
+            
+            // Show holdings analysis container
+            document.getElementById('holdings-analysis-container').style.display = 'block';
 
             // Clear previous header and show table
             document.getElementById('dynamicHeader').innerHTML = '';
@@ -729,6 +807,153 @@
       });
     });
 
+    // Holdings Analysis Functions
+    function initializeHoldingsAnalysis() {
+      const toggleBtn = document.getElementById('toggleHoldingsAnalysis');
+      const content = document.getElementById('holdings-analysis-content');
+      
+      toggleBtn.addEventListener('click', function() {
+        const isVisible = content.style.display !== 'none';
+        if (isVisible) {
+          content.style.display = 'none';
+          toggleBtn.textContent = 'Show Analysis';
+        } else {
+          content.style.display = 'block';
+          toggleBtn.textContent = 'Hide Analysis';
+          if (!window.holdingsAnalysisLoaded && window.currentAccount) {
+            loadHoldingsAnalysis(window.currentAccount);
+          }
+        }
+      });
+
+      // Add filter and sort event listeners
+      document.getElementById('holdingsFilter').addEventListener('input', filterHoldingsTable);
+      document.getElementById('holdingsSortBy').addEventListener('change', sortHoldingsTable);
+    }
+
+    function loadHoldingsAnalysis(accountNum) {
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      
+      document.getElementById('holdings-loading').style.display = 'block';
+      document.getElementById('holdings-error').style.display = 'none';
+      document.getElementById('holdings-summary').style.display = 'none';
+      document.getElementById('holdings-analysis-table').style.display = 'none';
+
+      let url = `scripts/holdings_analysis.php?acct_num=${accountNum}`;
+      if (startDate) url += `&start_date=${startDate}`;
+      if (endDate) url += `&end_date=${endDate}`;
+
+      fetch(url)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          document.getElementById('holdings-loading').style.display = 'none';
+          if (data && data.length > 0) {
+            displayHoldingsAnalysis(data);
+            window.holdingsAnalysisLoaded = true;
+          } else {
+            document.getElementById('holdings-error').textContent = 'No holdings analysis data found';
+            document.getElementById('holdings-error').style.display = 'block';
+          }
+        })
+        .catch(error => {
+          document.getElementById('holdings-loading').style.display = 'none';
+          document.getElementById('holdings-error').textContent = 'Error loading holdings analysis: ' + error.message;
+          document.getElementById('holdings-error').style.display = 'block';
+          console.error('Error loading holdings analysis:', error);
+        });
+    }
+
+    function displayHoldingsAnalysis(data) {
+      window.holdingsAnalysisData = data;
+      
+      // Display summary metrics
+      displayHoldingsSummary(data);
+      
+      // Display detailed table
+      displayHoldingsTable(data);
+      
+      document.getElementById('holdings-summary').style.display = 'block';
+      document.getElementById('holdings-analysis-table').style.display = 'block';
+    }
+
+    function displayHoldingsSummary(data) {
+      const totalHoldings = data.length;
+      const bestPerformer = data.reduce((best, current) => 
+        parseFloat(current.total_return_pct) > parseFloat(best.total_return_pct) ? current : best
+      );
+      const worstPerformer = data.reduce((worst, current) => 
+        parseFloat(current.total_return_pct) < parseFloat(worst.total_return_pct) ? current : worst
+      );
+      const avgDaysHeld = data.reduce((sum, item) => sum + parseFloat(item.days_held), 0) / data.length;
+
+      document.getElementById('totalHoldings').textContent = totalHoldings;
+      document.getElementById('bestPerformer').innerHTML = `${bestPerformer.ticker}<br><span style="font-size: 14px; color: #28a745;">${parseFloat(bestPerformer.total_return_pct).toFixed(1)}%</span>`;
+      document.getElementById('worstPerformer').innerHTML = `${worstPerformer.ticker}<br><span style="font-size: 14px; color: #dc3545;">${parseFloat(worstPerformer.total_return_pct).toFixed(1)}%</span>`;
+      document.getElementById('avgHoldingPeriod').textContent = Math.round(avgDaysHeld);
+    }
+
+    function displayHoldingsTable(data) {
+      const tbody = document.getElementById('holdingsAnalysisTableBody');
+      tbody.innerHTML = '';
+
+      data.forEach(holding => {
+        const row = document.createElement('tr');
+        row.style.borderBottom = '1px solid #dee2e6';
+
+        const totalReturn = parseFloat(holding.total_return_pct) || 0;
+        const annualizedReturn = parseFloat(holding.annualized_return_pct) || 0;
+        const volatility = parseFloat(holding.annualized_volatility_pct) || 0;
+        const sharpe = parseFloat(holding.sharpe_ratio) || 0;
+        const winRate = parseFloat(holding.win_rate_pct) || 0;
+        const realizedPnL = parseFloat(holding.realized_pnl) || 0;
+
+        row.innerHTML = `
+          <td style="padding: 8px; border: 1px solid #dee2e6; font-weight: 600;">${holding.ticker}</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">${new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD'}).format(parseFloat(holding.avg_position_value))}</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right; color: ${totalReturn >= 0 ? '#28a745' : '#dc3545'};">${totalReturn.toFixed(1)}%</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right; color: ${annualizedReturn >= 0 ? '#28a745' : '#dc3545'};">${annualizedReturn.toFixed(1)}%</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">${volatility.toFixed(1)}%</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right; color: ${sharpe >= 0 ? '#28a745' : '#dc3545'};">${sharpe.toFixed(2)}</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">${winRate.toFixed(1)}%</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">${holding.days_held}</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">${holding.total_transactions}</td>
+          <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right; color: ${realizedPnL >= 0 ? '#28a745' : '#dc3545'};">${new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD'}).format(realizedPnL)}</td>
+        `;
+        
+        tbody.appendChild(row);
+      });
+    }
+
+    function filterHoldingsTable() {
+      const filter = document.getElementById('holdingsFilter').value.toUpperCase();
+      const tbody = document.getElementById('holdingsAnalysisTableBody');
+      const rows = tbody.getElementsByTagName('tr');
+
+      for (let i = 0; i < rows.length; i++) {
+        const ticker = rows[i].getElementsByTagName('td')[0];
+        if (ticker) {
+          const txtValue = ticker.textContent || ticker.innerText;
+          rows[i].style.display = txtValue.toUpperCase().indexOf(filter) > -1 ? '' : 'none';
+        }
+      }
+    }
+
+    function sortHoldingsTable() {
+      const sortBy = document.getElementById('holdingsSortBy').value;
+      const sortedData = [...window.holdingsAnalysisData].sort((a, b) => {
+        const valueA = parseFloat(a[sortBy]) || 0;
+        const valueB = parseFloat(b[sortBy]) || 0;
+        return valueB - valueA; // Descending order
+      });
+      displayHoldingsTable(sortedData);
+    }
+
     // Toggle menu function
     function toggleMenu() {
       const sidebar = document.querySelector('.sidebar');
@@ -762,6 +987,9 @@
 
     // Set default end date to today
     document.getElementById('endDate').valueAsDate = new Date();
+    
+    // Initialize holdings analysis
+    initializeHoldingsAnalysis();
   </script>
   </div>
 </body>
