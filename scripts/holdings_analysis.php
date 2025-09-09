@@ -90,41 +90,58 @@ price_summary AS (
     GROUP BY ticker
 ),
 
+-- Calculate price endpoints for each ticker
+price_endpoints_calc AS (
+    SELECT 
+        ticker,
+        MIN(date) as start_date,
+        MAX(date) as end_date,
+        FIRST_VALUE(close) OVER (PARTITION BY ticker ORDER BY date) as start_price,
+        LAST_VALUE(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) as end_price
+    FROM holdings_timeline
+    WHERE cumulative_shares > 0
+),
+
+price_endpoints_summary AS (
+    SELECT DISTINCT
+        ticker,
+        start_date,
+        end_date,
+        FIRST_VALUE(start_price) OVER (PARTITION BY ticker) as start_price,
+        FIRST_VALUE(end_price) OVER (PARTITION BY ticker) as end_price
+    FROM price_endpoints_calc
+),
+
 performance_stats AS (
     SELECT 
         ticker,
-        -- Calculate proper holding period return using first/last holding dates
-        (LAST_VALUE(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) / 
-         FIRST_VALUE(close) OVER (PARTITION BY ticker ORDER BY date) - 1) as holding_period_return,
-        -- Annualized return based on holding period
-        POWER(LAST_VALUE(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) / 
-              FIRST_VALUE(close) OVER (PARTITION BY ticker ORDER BY date), 
-              365.0 / GREATEST(1, MAX(date) OVER (PARTITION BY ticker) - MIN(date) OVER (PARTITION BY ticker))) - 1 as annualized_return,
-        -- Volatility based on daily returns
+        -- Basic statistics from grouped data
         STDDEV(daily_return) * SQRT(252) as annualized_volatility,
-        -- Win rate
         COUNT(CASE WHEN daily_return > 0 THEN 1 END) * 1.0 / COUNT(*) as win_rate,
         MAX(daily_return) as best_day,
         MIN(daily_return) as worst_day,
-        -- Days held for reference
         COUNT(DISTINCT date) as trading_days
     FROM holdings_timeline
     WHERE cumulative_shares > 0
     GROUP BY ticker
 ),
 
--- Separate CTE to get unique holding period returns per ticker
 performance_summary AS (
-    SELECT DISTINCT
-        ticker,
-        FIRST_VALUE(holding_period_return) OVER (PARTITION BY ticker) as total_return,
-        FIRST_VALUE(annualized_return) OVER (PARTITION BY ticker) as annualized_return,
-        FIRST_VALUE(annualized_volatility) OVER (PARTITION BY ticker) as annualized_volatility,
-        FIRST_VALUE(win_rate) OVER (PARTITION BY ticker) as win_rate,
-        FIRST_VALUE(best_day) OVER (PARTITION BY ticker) as best_day,
-        FIRST_VALUE(worst_day) OVER (PARTITION BY ticker) as worst_day,
-        FIRST_VALUE(trading_days) OVER (PARTITION BY ticker) as trading_days
-    FROM performance_stats
+    SELECT 
+        ps.ticker,
+        -- Calculate returns using price endpoints
+        (pe.end_price / pe.start_price - 1) as total_return,
+        -- Annualized return based on actual holding period
+        CASE WHEN pe.end_date > pe.start_date 
+             THEN POWER(pe.end_price / pe.start_price, 365.0 / (pe.end_date - pe.start_date)) - 1
+             ELSE 0 END as annualized_return,
+        ps.annualized_volatility,
+        ps.win_rate,
+        ps.best_day,
+        ps.worst_day,
+        ps.trading_days
+    FROM performance_stats ps
+    JOIN price_endpoints_summary pe ON ps.ticker = pe.ticker
 ),
 
 transaction_analysis AS (
