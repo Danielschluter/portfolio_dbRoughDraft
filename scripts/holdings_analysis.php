@@ -1,3 +1,4 @@
+
 <?php
 header('Content-Type: application/json');
 
@@ -97,17 +98,42 @@ ending_positions AS (
     JOIN holding_dates hd ON h.ticker = hd.ticker AND h.date = hd.last_date
 ),
 
+-- Calculate daily returns for volatility
+daily_returns AS (
+    SELECT 
+        ticker,
+        date,
+        close,
+        LAG(close) OVER (PARTITION BY ticker ORDER BY date) as prev_close,
+        CASE WHEN LAG(close) OVER (PARTITION BY ticker ORDER BY date) IS NOT NULL
+             THEN (close / LAG(close) OVER (PARTITION BY ticker ORDER BY date)) - 1
+             ELSE 0 END as daily_return
+    FROM period_holdings
+),
+
+-- Calculate volatility
+volatility_stats AS (
+    SELECT 
+        ticker,
+        STDDEV(daily_return) * SQRT(252) * 100 as annualized_volatility_pct
+    FROM daily_returns
+    WHERE daily_return IS NOT NULL
+    GROUP BY ticker
+),
+
 -- Calculate transactions within period
 period_transactions AS (
     SELECT 
         ticker,
-        COUNT(*) as transactions_in_period,
+        COUNT(*) as total_transactions,
         SUM(CASE WHEN shares > 0 THEN shares ELSE 0 END) as shares_bought,
         SUM(CASE WHEN shares < 0 THEN ABS(shares) ELSE 0 END) as shares_sold,
         SUM(CASE WHEN shares > 0 THEN amount ELSE 0 END) as amount_invested,
         SUM(CASE WHEN shares < 0 THEN ABS(amount) ELSE 0 END) as amount_received,
         AVG(CASE WHEN shares > 0 THEN price END) as avg_buy_price,
-        AVG(CASE WHEN shares < 0 THEN price END) as avg_sell_price
+        AVG(CASE WHEN shares < 0 THEN price END) as avg_sell_price,
+        COUNT(CASE WHEN amount > 0 THEN 1 END) as winning_trades,
+        COUNT(*) as total_trades
     FROM transactions_filtered
     WHERE ticker != 'CASHX'
     AND transaction_date >= COALESCE('$start_date', '1900-01-01')::date
@@ -119,7 +145,7 @@ period_transactions AS (
 days_held AS (
     SELECT 
         ticker,
-        COUNT(DISTINCT date) as days_held_in_period
+        COUNT(DISTINCT date) as days_held
     FROM period_holdings
     GROUP BY ticker
 )
@@ -128,50 +154,49 @@ SELECT
     sp.ticker,
     sp.first_date,
     ep.last_date,
-    dh.days_held_in_period,
-    sp.starting_shares,
-    sp.starting_price,
-    sp.starting_value,
-    ep.ending_shares,
-    ep.ending_price,
-    ep.ending_value,
+    dh.days_held,
     
-    -- Change calculations
-    (ep.ending_shares - sp.starting_shares) as shares_change,
-    (ep.ending_value - sp.starting_value) as market_value_change,
-    CASE WHEN sp.starting_value > 0 
-         THEN ((ep.ending_value - sp.starting_value) / sp.starting_value) * 100
-         ELSE 0 END as market_value_change_pct,
+    -- Average position value (average of starting and ending values)
+    (sp.starting_value + ep.ending_value) / 2 as avg_position_value,
     
-    -- Price performance
-    (ep.ending_price - sp.starting_price) as price_change,
-    CASE WHEN sp.starting_price > 0 
-         THEN ((ep.ending_price - sp.starting_price) / sp.starting_price) * 100
-         ELSE 0 END as price_change_pct,
-    
-    -- Transaction data
-    COALESCE(pt.transactions_in_period, 0) as transactions_in_period,
-    COALESCE(pt.shares_bought, 0) as shares_bought,
-    COALESCE(pt.shares_sold, 0) as shares_sold,
-    COALESCE(pt.amount_invested, 0) as amount_invested,
-    COALESCE(pt.amount_received, 0) as amount_received,
-    COALESCE(pt.avg_buy_price, 0) as avg_buy_price,
-    COALESCE(pt.avg_sell_price, 0) as avg_sell_price,
-    
-    -- Net cash flow and realized P&L
-    COALESCE(pt.amount_received - pt.amount_invested, 0) as net_cash_flow,
-    
-    -- Total return including cash flows
-    (ep.ending_value - sp.starting_value + COALESCE(pt.amount_received - pt.amount_invested, 0)) as total_return,
+    -- Total return calculation including cash flows
     CASE WHEN sp.starting_value > 0 
          THEN ((ep.ending_value - sp.starting_value + COALESCE(pt.amount_received - pt.amount_invested, 0)) / sp.starting_value) * 100
-         ELSE 0 END as total_return_pct
+         ELSE 0 END as total_return_pct,
+    
+    -- Annualized return
+    CASE WHEN sp.starting_value > 0 AND dh.days_held > 0
+         THEN (POWER((ep.ending_value + COALESCE(pt.amount_received - pt.amount_invested, 0)) / sp.starting_value, 365.0 / dh.days_held) - 1) * 100
+         ELSE 0 END as annualized_return_pct,
+    
+    -- Volatility
+    COALESCE(vs.annualized_volatility_pct, 0) as annualized_volatility_pct,
+    
+    -- Sharpe ratio (assuming 0% risk-free rate)
+    CASE WHEN COALESCE(vs.annualized_volatility_pct, 0) > 0
+         THEN (CASE WHEN sp.starting_value > 0 AND dh.days_held > 0
+                    THEN (POWER((ep.ending_value + COALESCE(pt.amount_received - pt.amount_invested, 0)) / sp.starting_value, 365.0 / dh.days_held) - 1) * 100
+                    ELSE 0 END) / vs.annualized_volatility_pct
+         ELSE 0 END as sharpe_ratio,
+    
+    -- Win rate
+    CASE WHEN COALESCE(pt.total_trades, 0) > 0
+         THEN (COALESCE(pt.winning_trades, 0) * 100.0 / pt.total_trades)
+         ELSE 0 END as win_rate_pct,
+    
+    -- Transaction data
+    COALESCE(pt.total_transactions, 0) as total_transactions,
+    
+    -- Realized P&L
+    COALESCE(pt.amount_received - pt.amount_invested, 0) as realized_pnl
 
 FROM starting_positions sp
 JOIN ending_positions ep ON sp.ticker = ep.ticker
 JOIN days_held dh ON sp.ticker = dh.ticker
 LEFT JOIN period_transactions pt ON sp.ticker = pt.ticker
-ORDER BY sp.starting_value DESC";
+LEFT JOIN volatility_stats vs ON sp.ticker = vs.ticker
+WHERE sp.starting_value > 0
+ORDER BY avg_position_value DESC";
 
 $result = pg_query_params($con, $sql, array($acct_num));
 
