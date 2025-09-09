@@ -77,7 +77,7 @@ holding_dates AS (
 starting_positions AS (
     SELECT DISTINCT
         h.ticker,
-        h.first_date,
+        hd.first_date,
         FIRST_VALUE(h.cumulative_shares) OVER (PARTITION BY h.ticker ORDER BY h.date) as starting_shares,
         FIRST_VALUE(h.close) OVER (PARTITION BY h.ticker ORDER BY h.date) as starting_price,
         FIRST_VALUE(h.market_value) OVER (PARTITION BY h.ticker ORDER BY h.date) as starting_value
@@ -89,7 +89,7 @@ starting_positions AS (
 ending_positions AS (
     SELECT DISTINCT
         h.ticker,
-        h.last_date,
+        hd.last_date,
         FIRST_VALUE(h.cumulative_shares) OVER (PARTITION BY h.ticker ORDER BY h.date DESC) as ending_shares,
         FIRST_VALUE(h.close) OVER (PARTITION BY h.ticker ORDER BY h.date DESC) as ending_price,
         FIRST_VALUE(h.market_value) OVER (PARTITION BY h.ticker ORDER BY h.date DESC) as ending_value
