@@ -55,12 +55,14 @@ WHERE totalshares IS NOT NULL
 GROUP BY mktvalues.date, total_cf, contr_distr
 ORDER BY mktvalues.date
 )
-SELECT date, dailyval, total_cf, cash_balance, (dailyval + cash_balance) AS total_market_value, external_cf,
-( (dailyval + cash_balance) / ( LAG(dailyval, 1) OVER (ORDER BY date) + LAG(cash_balance, 1) OVER (ORDER BY date) + external_cf) ) AS factor,
-( (dailyval + cash_balance) / ( LAG(dailyval, 1) OVER (ORDER BY date) + LAG(cash_balance, 1) OVER (ORDER BY date) + external_cf) ) -1 AS pct_return
+SELECT twr.date, dailyval, total_cf, cash_balance, (dailyval + cash_balance) AS total_market_value, external_cf,
+/*( (dailyval + cash_balance) / ( LAG(dailyval, 1) OVER (ORDER BY twr.date) + LAG(cash_balance, 1) OVER (ORDER BY twr.date) + external_cf) ) AS factor,*/
+( (dailyval + cash_balance) / ( LAG(dailyval, 1) OVER (ORDER BY twr.date) + LAG(cash_balance, 1) OVER (ORDER BY twr.date) + external_cf) ) -1 AS pct_return, (return_factor - 1) AS spy_pct_return
 FROM twr
-WHERE date >= '".$start_date."' AND date <= '".$end_date.
-";";
+INNER JOIN spy_daily_return
+ON twr.date = spy_daily_return.date
+WHERE twr.date >= '".$start_date."' AND twr.date <= '".$end_date."
+'";
 
 $result = pg_query($con, $sql);
 

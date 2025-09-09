@@ -174,7 +174,7 @@
           if (!isNaN(cellValue) && cellValue !== null && cellValue !== '') {
             const num = parseFloat(cellValue);
             //console.log(x);
-            if (x == 'pct_return') {
+            if (x == 'pct_return' || x == 'spy_pct_return') {
               cellValue = (num * 100).toFixed(2) + '%';
             } else {
               cellValue = new Intl.NumberFormat('en-US', {
