@@ -90,26 +90,34 @@ price_summary AS (
     GROUP BY ticker
 ),
 
--- Calculate price endpoints for each ticker
-price_endpoints_calc AS (
+-- Calculate price endpoints for each ticker using simple aggregation
+price_endpoints_summary AS (
     SELECT 
         ticker,
         MIN(date) as start_date,
-        MAX(date) as end_date,
-        FIRST_VALUE(close) OVER (PARTITION BY ticker ORDER BY date) as start_price,
-        LAST_VALUE(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) as end_price
+        MAX(date) as end_date
     FROM holdings_timeline
     WHERE cumulative_shares > 0
+    GROUP BY ticker
 ),
 
-price_endpoints_summary AS (
+-- Get actual start and end prices
+start_prices AS (
     SELECT DISTINCT
-        ticker,
-        start_date,
-        end_date,
-        FIRST_VALUE(start_price) OVER (PARTITION BY ticker) as start_price,
-        FIRST_VALUE(end_price) OVER (PARTITION BY ticker) as end_price
-    FROM price_endpoints_calc
+        h.ticker,
+        FIRST_VALUE(h.close) OVER (PARTITION BY h.ticker ORDER BY h.date) as start_price
+    FROM holdings_timeline h
+    JOIN price_endpoints_summary pe ON h.ticker = pe.ticker AND h.date = pe.start_date
+    WHERE h.cumulative_shares > 0
+),
+
+end_prices AS (
+    SELECT DISTINCT
+        h.ticker,
+        FIRST_VALUE(h.close) OVER (PARTITION BY h.ticker ORDER BY h.date DESC) as end_price
+    FROM holdings_timeline h
+    JOIN price_endpoints_summary pe ON h.ticker = pe.ticker AND h.date = pe.end_date
+    WHERE h.cumulative_shares > 0
 ),
 
 performance_stats AS (
@@ -130,18 +138,22 @@ performance_summary AS (
     SELECT 
         ps.ticker,
         -- Calculate returns using price endpoints
-        (pe.end_price / pe.start_price - 1) as total_return,
+        (ep.end_price / sp.start_price - 1) as total_return,
         -- Annualized return based on actual holding period
         CASE WHEN pe.end_date > pe.start_date 
-             THEN POWER(pe.end_price / pe.start_price, 365.0 / (pe.end_date - pe.start_date)) - 1
+             THEN POWER(ep.end_price / sp.start_price, 365.0 / (pe.end_date - pe.start_date)) - 1
              ELSE 0 END as annualized_return,
         ps.annualized_volatility,
         ps.win_rate,
         ps.best_day,
         ps.worst_day,
-        ps.trading_days
+        ps.trading_days,
+        sp.start_price,
+        ep.end_price
     FROM performance_stats ps
     JOIN price_endpoints_summary pe ON ps.ticker = pe.ticker
+    JOIN start_prices sp ON ps.ticker = sp.ticker
+    JOIN end_prices ep ON ps.ticker = ep.ticker
 ),
 
 transaction_analysis AS (
@@ -168,9 +180,9 @@ SELECT
     pm.max_position_value,
     pm.min_position_value,
     pm.position_volatility,
-    prs.start_price,
-    prs.end_price,
-    (prs.end_price / prs.start_price - 1) * 100 as price_return_pct,
+    ps.start_price,
+    ps.end_price,
+    (ps.end_price / ps.start_price - 1) * 100 as price_return_pct,
     ps.total_return * 100 as total_return_pct,
     ps.annualized_return * 100 as annualized_return_pct,
     ps.annualized_volatility * 100 as annualized_volatility_pct,
@@ -195,7 +207,6 @@ SELECT
 FROM position_metrics pm
 LEFT JOIN performance_summary ps ON pm.ticker = ps.ticker
 LEFT JOIN transaction_analysis ta ON pm.ticker = ta.ticker
-LEFT JOIN price_summary prs ON pm.ticker = prs.ticker
 WHERE pm.days_with_position > 0
 ORDER BY pm.avg_position_value DESC";
 
