@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Stock Statement Parser</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        input[type="file"] { margin: 20px 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+
+    <h1>PDF Stock Statement Parser</h1>
+    <p>Upload a PDF of your stock account statement to parse holdings.</p>
+
+    <input type="file" id="pdfFileInput" accept=".pdf">
+
+    <div id="status">Waiting for a file...</div>
+    <div id="portfolioTableContainer"></div>
+
+    <script src="https://mozilla.github.io/pdf.js/build/pdf.js"></script>
+
+    <script>
+        document.getElementById('pdfFileInput').addEventListener('change', handleFileSelect, false);
+
+        async function handleFileSelect(event) {
+            const file = event.target.files[0];
+            const statusElement = document.getElementById('status');
+            const tableContainer = document.getElementById('portfolioTableContainer');
+
+            if (!file) {
+                statusElement.textContent = "No file selected.";
+                return;
+            }
+
+            statusElement.textContent = "Parsing PDF, please wait...";
+            tableContainer.innerHTML = '';
+
+            try {
+                // Read the file as an ArrayBuffer
+                const arrayBuffer = await file.arrayBuffer();
+
+                // Parse the PDF
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+                let allText = "";
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    allText += pageText + ' ';
+                }
+
+                // Call the parsing function to extract data
+                const holdings = parseTextForHoldings(allText);
+
+                if (holdings.length > 0) {
+                    displayPortfolioData(holdings);
+                    statusElement.textContent = "Data parsed successfully!";
+                } else {
+                    statusElement.textContent = "No stock holdings found. The PDF format may not be supported.";
+                }
+
+            } catch (error) {
+                statusElement.textContent = `An error occurred: ${error.message}`;
+                console.error(error);
+            }
+        }
+
+        function parseTextForHoldings(text) {
+            const holdings = [];
+            // This is the tricky part: creating regex to match patterns in the text.
+            // This regex assumes a simple table-like structure with ticker, shares, market value, and cost basis.
+            // It looks for a pattern of uppercase letters (ticker), followed by numbers (shares, value, etc.).
+            const regex = /(\b[A-Z]{1,5}\b)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)/g;
+            let match;
+
+            while ((match = regex.exec(text)) !== null) {
+                // Remove commas from numbers
+                const shares = parseFloat(match[2].replace(/,/g, ''));
+                const marketValue = parseFloat(match[3].replace(/,/g, ''));
+                const costBasis = parseFloat(match[4].replace(/,/g, ''));
+
+                holdings.push({
+                    ticker: match[1],
+                    shares: shares,
+                    marketValue: marketValue,
+                    costBasis: costBasis
+                });
+            }
+            return holdings;
+        }
+
+        function displayPortfolioData(data) {
+            const tableContainer = document.getElementById('portfolioTableContainer');
+            const table = document.createElement('table');
+            const thead = document.createElement('thead');
+            const tbody = document.createElement('tbody');
+
+            const headers = ['Ticker', 'Shares', 'Market Value', 'Cost Basis'];
+            const headerRow = document.createElement('tr');
+            headers.forEach(headerText => {
+                const th = document.createElement('th');
+                th.textContent = headerText;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            data.forEach(holding => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${holding.ticker}</td>
+                    <td>${holding.shares}</td>
+                    <td>$${holding.marketValue.toFixed(2)}</td>
+                    <td>$${holding.costBasis.toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            tableContainer.appendChild(table);
+        }
+    </script>
+</body>
+</html>
