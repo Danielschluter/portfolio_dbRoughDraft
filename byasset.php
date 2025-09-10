@@ -82,6 +82,43 @@ ORDER BY
   gain_loss DESC;
 ";
 
+
+$sql = "WITH cte AS (
+SELECT
+    t.ticker,
+    SUM(CASE WHEN t.transaction_date < '".$beg."' THEN t.shares ELSE 0 END) AS beg_shares,
+    SUM(CASE WHEN t.transaction_date BETWEEN '".$beg."' AND '".$end."' THEN t.shares ELSE 0 END) AS shares_bought_sold,
+    SUM(CASE WHEN t.transaction_date BETWEEN '".$beg."' AND '".$end."' THEN t.amount ELSE 0 END) AS cf,
+    SUM(CASE WHEN t.transaction_date < '".$end."' THEN t.shares ELSE 0 END) AS end_shares,
+    SUM(CASE WHEN t.transaction_date < '".$beg."' THEN t.shares ELSE 0 END) * beg_prices.close AS beg_value,
+    SUM(CASE WHEN t.transaction_date < '".$end."' THEN t.shares ELSE 0 END) * end_prices.close AS end_value
+FROM
+    transactions_temp AS t
+JOIN
+    prices_stocks AS beg_prices ON t.ticker = beg_prices.ticker AND beg_prices.date = '".$beg."'
+JOIN
+    prices_stocks AS end_prices ON t.ticker = end_prices.ticker AND end_prices.date = '".$end."'
+WHERE
+    t.acct_num = 592
+GROUP BY
+    t.ticker, beg_prices.close, end_prices.close
+),
+gain_loss AS (
+SELECT
+  ticker,
+  beg_shares,
+  shares_bought_sold,
+  end_shares,
+  beg_value,
+  cf,
+  end_value,
+  (end_value - (beg_value - cf)) AS gain_loss
+FROM cte
+)
+SELECT * FROM gain_loss
+WHERE gain_loss <> 0
+ORDER BY (end_value - (beg_value - cf)) DESC";
+
 $result = pg_query($con, $sql);
 if (!$result) {
     echo "An error occurred.\n";
