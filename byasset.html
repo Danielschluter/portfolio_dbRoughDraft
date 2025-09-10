@@ -69,9 +69,17 @@
         #results-table th {
             background-color: #f2f2f2;
             font-weight: bold;
+            cursor: pointer;
         }
         #results-table tr:nth-child(even) {
             background-color: #f9f9f9;
+        }
+        /* Styling for sort indicators */
+        #results-table th.sort-asc::after {
+            content: ' \25B2';
+        }
+        #results-table th.sort-desc::after {
+            content: ' \25BC';
         }
     </style>
 </head>
@@ -134,6 +142,9 @@
             }
         }
 
+        let currentData = []; // To store the data fetched from the API
+        let currentSort = { column: null, ascending: true }; // To keep track of sorting state
+
         async function fetchPerformanceData() {
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
@@ -156,63 +167,100 @@
                     return;
                 }
 
+                currentData = data; // Store the fetched data
                 let tableHTML = '<h2>Performance Results</h2>';
                 tableHTML += '<table id="results-table"><thead><tr>';
                 const headers = Object.keys(data[0]);
-                for (const header of headers) {
-                    tableHTML += `<th>${header.replace(/_/g, ' ').toUpperCase()}</th>`;
+                for (let i = 0; i < headers.length; i++) {
+                    tableHTML += `<th onclick="sortTable(${i})">${headers[i].replace(/_/g, ' ').toUpperCase()}</th>`;
                 };
 
-                tableHTML += '</tr></thead><tbody>';
-                for (let row of data) {
-                    tableHTML += '<tr>';
-                    for (let col in row) {
-                        if (col === 'contribution_to_return_pct') {
-                            tableHTML += `<td>${(row[col] * 1).toFixed(2)}%</td>`;
-                        } else if (col === 'ticker') {
-                             tableHTML += `<td>${row[col]}</td>`;
-                        } else {
-                            // Format as currency
-                            tableHTML += `<td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row[col])}</td>`;
-
-                        }
-                       
-                    }
-                    tableHTML += '</tr>';
-                }
+                tableHTML += '</tr></thead><tbody id="table-body">';
+                tableHTML += generateTableRows(data);
                 tableHTML += '</tbody></table>';
 
-                // Build the table
-               /* let tableHTML = '<h2>Performance Results</h2>';
-                tableHTML += '<table id="results-table"><thead><tr>';
-
-                // Create table headers from the first object's keys
-                const headers = Object.keys(data[0]);
-                headers.forEach(header => {
-                    tableHTML += `<th>${header.replace(/_/g, ' ').toUpperCase()}</th>`;
-                });
-                tableHTML += '</tr></thead><tbody>';
-
-                // Create table rows from the data
-                data.forEach(row => {
-                    tableHTML += '<tr>';
-                    headers.forEach(header => {
-                        tableHTML += `<td>${row[header]}</td>`;
-                    });
-                    tableHTML += '</tr>';
-                });
-
-                tableHTML += '</tbody></table>'; */
                 resultsContainer.innerHTML = tableHTML;
+                updateSortHeaders(currentSort.column ? headers.indexOf(currentSort.column) : -1); // Initialize sort indicators
 
             } catch (error) {
                 console.error('Error fetching performance data:', error);
                 resultsContainer.innerHTML = '<p>An error occurred while fetching data. Please check the console for details.</p>';
             }
         }
-    </script>
 
-    <script>
+        function generateTableRows(data) {
+            let rowsHTML = '';
+            for (let row of data) {
+                rowsHTML += '<tr>';
+                for (let col in row) {
+                    if (col === 'contribution_to_return_pct') {
+                        rowsHTML += `<td>${(row[col] * 1).toFixed(2)}%</td>`;
+                    } else if (col === 'ticker') {
+                        rowsHTML += `<td>${row[col]}</td>`;
+                    } else {
+                        // Format as currency
+                        rowsHTML += `<td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row[col])}</td>`;
+                    }
+                }
+                rowsHTML += '</tr>';
+            }
+            return rowsHTML;
+        }
+
+        function sortTable(columnIndex) {
+            if (!currentData.length) return;
+
+            const headers = Object.keys(currentData[0]);
+            const columnKey = headers[columnIndex];
+
+            // Toggle sort direction if same column, otherwise default to ascending
+            if (currentSort.column === columnKey) {
+                currentSort.ascending = !currentSort.ascending;
+            } else {
+                currentSort.column = columnKey;
+                currentSort.ascending = true;
+            }
+
+            // Sort the data
+            const sortedData = [...currentData].sort((a, b) => {
+                const valueA = a[columnKey];
+                const valueB = b[columnKey];
+
+                // Handle numeric sorting
+                if (!isNaN(valueA) && !isNaN(valueB)) {
+                    return currentSort.ascending ? valueA - valueB : valueB - valueA;
+                }
+
+                // Handle string sorting
+                const stringA = String(valueA).toLowerCase();
+                const stringB = String(valueB).toLowerCase();
+
+                if (currentSort.ascending) {
+                    return stringA.localeCompare(stringB);
+                } else {
+                    return stringB.localeCompare(stringA);
+                }
+            });
+
+            // Update table body
+            const tableBody = document.getElementById('table-body');
+            if (tableBody) {
+                tableBody.innerHTML = generateTableRows(sortedData);
+            }
+
+            // Update header styling
+            updateSortHeaders(columnIndex);
+        }
+
+        function updateSortHeaders(activeColumnIndex) {
+            const headers = document.querySelectorAll('#results-table th');
+            headers.forEach((header, index) => {
+                header.classList.remove('sort-asc', 'sort-desc');
+                if (index === activeColumnIndex) {
+                    header.classList.add(currentSort.ascending ? 'sort-asc' : 'sort-desc');
+                }
+            });
+        }
 
         const data = [
             {
@@ -633,7 +681,7 @@
         }
 
         // Let's generate the cash flows from your data
-        const cashFlows = getCashFlows(stockData);
+        const cashFlows = getCashFlows(data); // Changed stockData to data
 
         console.log("Generated Cash Flows:", cashFlows);
         // Expected Output: [-1722.9, 0, 0, ..., 0, 2601.17]
