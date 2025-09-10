@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parse PDF with PDF.js</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+
+    <h1>PDF Table Parsing Example</h1>
+    <p>Select a PDF file to extract its text content.</p>
+
+    <input type="file" id="pdfFile" accept=".pdf">
+
+    <script>
+
+      // Set the workerSrc for PDF.js. This is crucial for the library to work.
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+/**
+ * Takes the text content from a PDF.js page and organizes it into a table-like structure.
+ * @param {object} textContent - The text content object returned by page.getTextContent().
+ * @returns {Array<Array<string>>} An array of rows, where each row is an array of cell strings.
+ */
+function extractTableFromTextContent(textContent) {
+    // A small tolerance (in PDF units) for grouping text items into the same row.
+    // This value might need to be adjusted depending on the PDF.
+    const Y_TOLERANCE = 5;
+
+    // Group items by their vertical position (y-coordinate)
+    const rows = {};
+    textContent.items.forEach(item => {
+        // Use the y-coordinate as a key, rounding to a near-integer to handle small variations
+        const yCoord = Math.round(item.transform[5] / Y_TOLERANCE) * Y_TOLERANCE;
+        if (!rows[yCoord]) {
+            rows[yCoord] = [];
+        }
+        rows[yCoord].push(item);
+    });
+
+    // Sort the rows by their y-coordinate in descending order (top to bottom)
+    const sortedRows = Object.keys(rows).sort((a, b) => b - a).map(key => rows[key]);
+
+    // Now, for each row, sort the items by their x-coordinate to ensure correct left-to-right order.
+    const tableData = [];
+    sortedRows.forEach(row => {
+        row.sort((a, b) => a.transform[4] - b.transform[4]);
+        const rowText = row.map(item => item.str.trim()).join(' ');
+
+        // This is a basic example. For real columns, you would need to analyze horizontal spacing
+        // to split the rowText into individual cells. For now, it returns a single string per row.
+        tableData.push(rowText);
+    });
+
+    return tableData;
+}
+
+// Add an event listener to the file input to handle file selection
+document.getElementById('pdfFile').addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (!file) {
+        return;
+    }
+
+    const fileReader = new FileReader();
+    fileReader.onload = async () => {
+        const typedarray = new Uint8Array(fileReader.result);
+
+        try {
+            // Load the PDF document
+            const loadingTask = pdfjsLib.getDocument(typedarray);
+            const pdf = await loadingTask.promise;
+            console.log('PDF loaded successfully. Number of pages:', pdf.numPages);
+
+            // Get the first page of the document
+            const page = await pdf.getPage(4);
+            console.log('Page 1 loaded.');
+
+            // Get the text content for this page
+            const textContent = await page.getTextContent();
+
+            // Extract the table structure from the text content
+            const extractedTable = extractTableFromTextContent(textContent);
+
+            // Log the result to the console for you to view
+            console.log("Extracted Table Rows:");
+            extractedTable.forEach(row => {
+                console.log(row);
+            });
+
+        } catch (error) {
+            console.error('Error loading or parsing PDF:', error);
+        }
+    };
+    // Read the file as an ArrayBuffer, which PDF.js can process
+    fileReader.readAsArrayBuffer(file);
+});
+    </script>
+
+</body>
+</html>

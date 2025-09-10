@@ -91,7 +91,9 @@ SELECT
     SUM(CASE WHEN t.transaction_date BETWEEN '".$beg."' AND '".$end."' THEN t.amount ELSE 0 END) AS cf,
     SUM(CASE WHEN t.transaction_date < '".$end."' THEN t.shares ELSE 0 END) AS end_shares,
     SUM(CASE WHEN t.transaction_date < '".$beg."' THEN t.shares ELSE 0 END) * beg_prices.close AS beg_value,
-    SUM(CASE WHEN t.transaction_date < '".$end."' THEN t.shares ELSE 0 END) * end_prices.close AS end_value
+    SUM(CASE WHEN t.transaction_date < '".$end."' THEN t.shares ELSE 0 END) * end_prices.close AS end_value,
+    beg_prices.close AS beg_price,
+    end_prices.close AS end_price
 FROM
     transactions_temp AS t
 JOIN
@@ -112,7 +114,9 @@ SELECT
   beg_value,
   cf,
   end_value,
-  (end_value - (beg_value - cf)) AS gain_loss
+  (end_value - (beg_value - cf)) AS gain_loss,
+  beg_price,
+  end_price
 FROM cte
 )
 SELECT * FROM gain_loss
