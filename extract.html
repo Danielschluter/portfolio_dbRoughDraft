@@ -77,37 +77,115 @@
             const textContent = await page.getTextContent();
             let extractedTable = [];
             let currentRow = [];
-            let previousY = -1; // To track vertical position for row grouping
+            let previousY = -1;
 
-            // Basic heuristic for table detection: look for aligned text blocks
-            // This is a simplified example and might need significant refinement
-            // depending on the PDF structure
+            // Group text items by rows based on Y position
             textContent.items.forEach(item => {
-                const y = item.transform[5]; // Y-coordinate of the text item
+                const y = item.transform[5];
+                const height = item.height || 12;
 
-                // If a significant vertical gap exists, consider it a new row
-                if (previousY !== -1 && Math.abs(y - previousY) > item.height * 1.5) {
+                if (previousY !== -1 && Math.abs(y - previousY) > height * 0.8) {
                     if (currentRow.length > 0) {
                         extractedTable.push(currentRow);
                     }
                     currentRow = [];
                 }
-                currentRow.push({ text: item.str, x: item.transform[4], y: y });
+                currentRow.push({ 
+                    text: item.str.trim(), 
+                    x: item.transform[4], 
+                    y: y,
+                    width: item.width || 0
+                });
                 previousY = y;
             });
+            
             if (currentRow.length > 0) {
                 extractedTable.push(currentRow);
             }
 
-            // Further processing (e.g., sorting by X to get columns, padding for empty cells)
-            // This part requires more advanced logic and tailoring to your PDF's tables
-            let formattedTable = extractedTable.map(row => {
-                // Sort items in a row by their x-coordinate to ensure correct column order
-                row.sort((a, b) => a.x - b.x);
-                return row.map(item => item.text).join('\t'); // Use tabs for simple column separation
-            }).join('\n'); // Join rows with newlines
+            // Parse holdings data
+            const holdings = parseHoldingsFromTable(extractedTable);
+            
+            // Display both raw table and parsed holdings
+            let output = "=== PARSED HOLDINGS ===\n";
+            if (holdings.length > 0) {
+                output += "Ticker\tShares\tMarket Value\tCost Basis\n";
+                output += "─".repeat(50) + "\n";
+                holdings.forEach(holding => {
+                    output += `${holding.ticker}\t${holding.shares}\t$${holding.marketValue}\t$${holding.costBasis}\n`;
+                });
+            } else {
+                output += "No holdings found. Check the raw table data below.\n";
+            }
 
-            extractedTextPre.textContent = formattedTable;
+            output += "\n=== RAW TABLE DATA ===\n";
+            extractedTable.forEach((row, idx) => {
+                row.sort((a, b) => a.x - b.x);
+                const rowText = row.map(item => item.text).filter(text => text.length > 0).join('\t');
+                if (rowText.trim()) {
+                    output += `Row ${idx + 1}: ${rowText}\n`;
+                }
+            });
+
+            extractedTextPre.textContent = output;
+        }
+
+        function parseHoldingsFromTable(table) {
+            const holdings = [];
+            
+            // Common patterns for ticker symbols (1-5 uppercase letters, sometimes with numbers)
+            const tickerPattern = /^[A-Z]{1,5}[0-9]*$/;
+            
+            // Patterns for currency amounts (with or without $ sign, with commas)
+            const currencyPattern = /^\$?[\d,]+\.?\d*$/;
+            const numberPattern = /^[\d,]+\.?\d*$/;
+
+            table.forEach(row => {
+                if (row.length < 3) return; // Need at least ticker and 2 values
+                
+                row.sort((a, b) => a.x - b.x);
+                const texts = row.map(item => item.text.trim()).filter(text => text.length > 0);
+                
+                // Look for patterns: Ticker, Shares, Market Value, Cost Basis
+                for (let i = 0; i < texts.length - 2; i++) {
+                    const potentialTicker = texts[i];
+                    
+                    // Check if this looks like a ticker symbol
+                    if (tickerPattern.test(potentialTicker)) {
+                        const remainingTexts = texts.slice(i + 1);
+                        
+                        // Try to find numeric values after the ticker
+                        const numericValues = [];
+                        for (const text of remainingTexts) {
+                            if (numberPattern.test(text) || currencyPattern.test(text)) {
+                                // Clean the number (remove $ and commas)
+                                const cleanValue = text.replace(/[$,]/g, '');
+                                if (!isNaN(parseFloat(cleanValue))) {
+                                    numericValues.push(parseFloat(cleanValue));
+                                }
+                            }
+                        }
+                        
+                        // If we have at least 2-3 numeric values, treat as a holding
+                        if (numericValues.length >= 2) {
+                            const holding = {
+                                ticker: potentialTicker,
+                                shares: numericValues[0] || 0,
+                                marketValue: numericValues[1] || 0,
+                                costBasis: numericValues[2] || numericValues[1] // Use market value if cost basis not available
+                            };
+                            
+                            // Basic validation - skip if values seem unreasonable
+                            if (holding.shares > 0 && holding.marketValue > 0) {
+                                holdings.push(holding);
+                            }
+                        }
+                        break; // Move to next row after processing this ticker
+                    }
+                }
+            });
+
+            return holdings;
         }
 
         function queueRenderPage(num) {
