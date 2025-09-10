@@ -57,19 +57,39 @@
         SELECT
             date,
             pr.ticker,
-            shares,
+            COALESCE(shares, 0) as shares,
             close,
-            SUM(tr.shares) OVER (PARTITION BY pr.ticker ORDER BY pr.date) AS totalshares,
-            pr.close * SUM(tr.shares) OVER (PARTITION BY pr.ticker ORDER BY pr.date) AS marketvalue,
-            SUM(amount) OVER (PARTITION BY pr.date, pr.ticker ORDER BY pr.date) AS cf
+            SUM(COALESCE(tr.shares, 0)) OVER (PARTITION BY pr.ticker ORDER BY pr.date) AS totalshares,
+            pr.close * SUM(COALESCE(tr.shares, 0)) OVER (PARTITION BY pr.ticker ORDER BY pr.date) AS marketvalue,
+            COALESCE(SUM(amount) OVER (PARTITION BY pr.ticker ORDER BY pr.date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS cf,
+            LAG(pr.close) OVER (PARTITION BY pr.ticker ORDER BY pr.date) AS prev_close,
+            COALESCE(amount, 0) as daily_cf
         FROM pr
         LEFT JOIN tr
         ON pr.date = tr.transaction_date
         AND pr.ticker = tr.ticker
         ORDER BY ticker, date
+    ),
+    returns AS (
+        SELECT *,
+            CASE 
+                WHEN prev_close IS NOT NULL AND prev_close > 0 AND totalshares > 0 THEN
+                    ((close - prev_close) / prev_close) * 100
+                ELSE 0
+            END AS daily_return_pct
+        FROM mktvalues
     )
-    SELECT * FROM mktvalues
-    WHERE marketvalue IS NOT NULL
+    SELECT 
+        date,
+        ticker,
+        shares,
+        close,
+        totalshares,
+        marketvalue,
+        cf,
+        ROUND(daily_return_pct, 4) as daily_return_pct
+    FROM returns
+    WHERE totalshares > 0 OR shares != 0
     ORDER BY ticker, date";
 
     $result = pg_query($con, $sql);
@@ -108,8 +128,8 @@ $df = [];
         const visibleRows = Math.ceil(tableContainer.clientHeight / rowHeight);
         let start = 0;
 
-        // Set the total height of the content div to create the scrollbar
-        tableContent.style.height = `${data.length * rowHeight}px`;
+        // Set the total height of the content div to create the scrollbar (+1 for header)
+        tableContent.style.height = `${(data.length + 1) * rowHeight}px`;
 
         // Function to render the rows
         function renderRows() {
@@ -123,11 +143,14 @@ $df = [];
             if (data.length > 0) {
                 const headerRow = document.createElement('div');
                 headerRow.className = 'virtual-table-row virtual-table-header';
+                headerRow.style.position = 'sticky';
+                headerRow.style.top = '0px';
+                headerRow.style.zIndex = '10';
 
                 // Assuming your data rows have consistent keys, we can use the first one for headers
                 Object.keys(data[0]).forEach(key => {
                     const headerCell = document.createElement('div');
-                    headerCell.textContent = key;
+                    headerCell.textContent = key.replace('_', ' ').toUpperCase();
                     headerRow.appendChild(headerCell);
                 });
                 fragment.appendChild(headerRow);
@@ -139,12 +162,23 @@ $df = [];
                 const rowDiv = document.createElement('div');
                 rowDiv.className = 'virtual-table-row';
                 rowDiv.style.position = 'absolute';
-                rowDiv.style.top = `${i * rowHeight}px`;
+                rowDiv.style.top = `${(i + 1) * rowHeight}px`; // +1 to account for header
                 rowDiv.style.width = '100%';
 
                 for (const key in rowData) {
                     const cell = document.createElement('div');
-                    cell.textContent = rowData[key];
+                    if (key === 'daily_return_pct') {
+                        const returnValue = parseFloat(rowData[key]);
+                        cell.textContent = returnValue.toFixed(2) + '%';
+                        cell.style.color = returnValue >= 0 ? 'green' : 'red';
+                    } else if (key === 'marketvalue' || key === 'cf') {
+                        cell.textContent = parseFloat(rowData[key]).toLocaleString('en-US', {
+                            style: 'currency',
+                            currency: 'USD'
+                        });
+                    } else {
+                        cell.textContent = rowData[key];
+                    }
                     rowDiv.appendChild(cell);
                 }
                 fragment.appendChild(rowDiv);
