@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>PDF Upload and Display with Table Extraction</title>
+    <style>
+        #pdf-canvas {
+            border: 1px solid black;
+        }
+        #extracted-text {
+            white-space: pre-wrap; /* Preserve line breaks and spaces */
+            font-family: monospace; /* For better alignment */
+        }
+    </style>
+</head>
+<body>
+    <input type="file" id="pdfUpload" accept="application/pdf">
+    <button id="prevPage">Previous</button>
+    <span id="page_num"></span> / <span id="page_count"></span>
+    <button id="nextPage">Next</button>
+    <br><br>
+    <canvas id="pdf-canvas"></canvas>
+    <br><br>
+    <h2>Extracted Table Data (Page <span id="extracted_page_num"></span>):</h2>
+    <pre id="extracted-text"></pre>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js"></script>
+
+    <script>
+        const fileInput = document.getElementById('pdfUpload');
+        const prevPageBtn = document.getElementById('prevPage');
+        const nextPageBtn = document.getElementById('nextPage');
+        const pageNumSpan = document.getElementById('page_num');
+        const pageCountSpan = document.getElementById('page_count');
+        const extractedPageNumSpan = document.getElementById('extracted_page_num');
+        const extractedTextPre = document.getElementById('extracted-text');
+        const canvas = document.getElementById('pdf-canvas');
+        const context = canvas.getContext('2d');
+
+        let pdfDoc = null;
+        let pageNum = 1;
+        let pageRendering = false;
+        let pageNumPending = null;
+        const scale = 1.5;
+
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        async function renderPage(num) {
+            pageRendering = true;
+            const page = await pdfDoc.getPage(num);
+            const viewport = page.getViewport({ scale: scale });
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            const renderContext = {
+                canvasContext: context,
+                viewport: viewport
+            };
+
+            const renderTask = page.render(renderContext);
+            await renderTask.promise;
+            pageRendering = false;
+
+            if (pageNumPending !== null) {
+                renderPage(pageNumPending);
+                pageNumPending = null;
+            }
+            pageNumSpan.textContent = num;
+            extractedPageNumSpan.textContent = num;
+
+            // Extract text from the current page and attempt to detect tables
+            await extractTableData(page);
+        }
+
+        async function extractTableData(page) {
+            const textContent = await page.getTextContent();
+            let extractedTable = [];
+            let currentRow = [];
+            let previousY = -1; // To track vertical position for row grouping
+
+            // Basic heuristic for table detection: look for aligned text blocks
+            // This is a simplified example and might need significant refinement
+            // depending on the PDF structure
+            textContent.items.forEach(item => {
+                const y = item.transform[5]; // Y-coordinate of the text item
+
+                // If a significant vertical gap exists, consider it a new row
+                if (previousY !== -1 && Math.abs(y - previousY) > item.height * 1.5) {
+                    if (currentRow.length > 0) {
+                        extractedTable.push(currentRow);
+                    }
+                    currentRow = [];
+                }
+                currentRow.push({ text: item.str, x: item.transform[4], y: y });
+                previousY = y;
+            });
+            if (currentRow.length > 0) {
+                extractedTable.push(currentRow);
+            }
+
+            // Further processing (e.g., sorting by X to get columns, padding for empty cells)
+            // This part requires more advanced logic and tailoring to your PDF's tables
+            let formattedTable = extractedTable.map(row => {
+                // Sort items in a row by their x-coordinate to ensure correct column order
+                row.sort((a, b) => a.x - b.x);
+                return row.map(item => item.text).join('\t'); // Use tabs for simple column separation
+            }).join('\n'); // Join rows with newlines
+
+            extractedTextPre.textContent = formattedTable;
+        }
+
+        function queueRenderPage(num) {
+            if (pageRendering) {
+                pageNumPending = num;
+            } else {
+                renderPage(num);
+            }
+        }
+
+        function onPrevPage() {
+            if (pageNum <= 1) {
+                return;
+            }
+            pageNum--;
+            queueRenderPage(pageNum);
+        }
+
+        function onNextPage() {
+            if (pageNum >= pdfDoc.numPages) {
+                return;
+            }
+            pageNum++;
+            queueRenderPage(pageNum);
+        }
+
+        fileInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file && file.type === 'application/pdf') {
+                const reader = new FileReader();
+
+                reader.onload = async function() {
+                    const typedarray = new Uint8Array(this.result);
+                    const loadingTask = pdfjsLib.getDocument({ data: typedarray });
+                    pdfDoc = await loadingTask.promise;
+                    pageCountSpan.textContent = pdfDoc.numPages;
+                    pageNum = 1; // Reset page number to 1 for the new PDF
+                    renderPage(pageNum);
+                };
+
+                reader.readAsArrayBuffer(file);
+            } else {
+                alert('Please upload a valid PDF file.');
+            }
+        });
+
+        prevPageBtn.addEventListener('click', onPrevPage);
+        nextPageBtn.addEventListener('click', onNextPage);
+    </script>
+</body>
+</html>
