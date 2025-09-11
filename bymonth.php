@@ -34,15 +34,16 @@ date_mappings AS (
         mp.month_year,
         mp.month_start_date,
         mp.month_end_date,
-        (SELECT MAX(ps.date) 
+        -- For beginning date, find the most recent price date before the month starts
+        -- Use a more flexible approach that doesn't require all tickers to have the same date
+        (SELECT MAX(date) 
          FROM prices_stocks ps 
          WHERE ps.date <= (mp.month_start_date - INTERVAL '1 day')
-           AND ps.ticker IN (SELECT DISTINCT ticker FROM transactions_temp WHERE acct_num = " . $q . ")
         ) AS beg_price_date,
-        (SELECT MAX(ps.date) 
+        -- For ending date, find the most recent price date on or before month end
+        (SELECT MAX(date) 
          FROM prices_stocks ps 
          WHERE ps.date <= mp.month_end_date
-           AND ps.ticker IN (SELECT DISTINCT ticker FROM transactions_temp WHERE acct_num = " . $q . ")
         ) AS end_price_date
     FROM monthly_periods mp
 ),
@@ -57,16 +58,24 @@ monthly_performance AS (
         COALESCE(
             (
                 SELECT SUM(
-                    (SELECT SUM(CASE WHEN tr.transaction_date <= (dm.month_start_date - INTERVAL '1 day') THEN tr.shares ELSE 0 END) 
-                     FROM transactions_temp tr 
-                     WHERE tr.ticker = p.ticker AND tr.acct_num = " . $q . ") * p.close
+                    shares_held * price
                 )
-                FROM prices_stocks p
-                WHERE p.date = dm.beg_price_date
-                AND p.ticker IN (SELECT DISTINCT ticker FROM transactions_temp WHERE acct_num = " . $q . ")
-                AND (SELECT SUM(CASE WHEN tr.transaction_date <= (dm.month_start_date - INTERVAL '1 day') THEN tr.shares ELSE 0 END) 
-                     FROM transactions_temp tr 
-                     WHERE tr.ticker = p.ticker AND tr.acct_num = " . $q . ") > 0
+                FROM (
+                    SELECT 
+                        t.ticker,
+                        SUM(CASE WHEN t.transaction_date <= (dm.month_start_date - INTERVAL '1 day') THEN t.shares ELSE 0 END) as shares_held,
+                        (SELECT p.close 
+                         FROM prices_stocks p 
+                         WHERE p.ticker = t.ticker 
+                         AND p.date <= dm.beg_price_date 
+                         ORDER BY p.date DESC 
+                         LIMIT 1) as price
+                    FROM transactions_temp t
+                    WHERE t.acct_num = " . $q . "
+                    GROUP BY t.ticker
+                    HAVING SUM(CASE WHEN t.transaction_date <= (dm.month_start_date - INTERVAL '1 day') THEN t.shares ELSE 0 END) > 0
+                ) ticker_values
+                WHERE price IS NOT NULL
             ), 0
         ) AS beginning_portfolio_value,
         
@@ -74,16 +83,24 @@ monthly_performance AS (
         COALESCE(
             (
                 SELECT SUM(
-                    (SELECT SUM(CASE WHEN tr.transaction_date <= dm.month_end_date THEN tr.shares ELSE 0 END) 
-                     FROM transactions_temp tr 
-                     WHERE tr.ticker = p.ticker AND tr.acct_num = " . $q . ") * p.close
+                    shares_held * price
                 )
-                FROM prices_stocks p
-                WHERE p.date = dm.end_price_date
-                AND p.ticker IN (SELECT DISTINCT ticker FROM transactions_temp WHERE acct_num = " . $q . ")
-                AND (SELECT SUM(CASE WHEN tr.transaction_date <= dm.month_end_date THEN tr.shares ELSE 0 END) 
-                     FROM transactions_temp tr 
-                     WHERE tr.ticker = p.ticker AND tr.acct_num = " . $q . ") > 0
+                FROM (
+                    SELECT 
+                        t.ticker,
+                        SUM(CASE WHEN t.transaction_date <= dm.month_end_date THEN t.shares ELSE 0 END) as shares_held,
+                        (SELECT p.close 
+                         FROM prices_stocks p 
+                         WHERE p.ticker = t.ticker 
+                         AND p.date <= dm.end_price_date 
+                         ORDER BY p.date DESC 
+                         LIMIT 1) as price
+                    FROM transactions_temp t
+                    WHERE t.acct_num = " . $q . "
+                    GROUP BY t.ticker
+                    HAVING SUM(CASE WHEN t.transaction_date <= dm.month_end_date THEN t.shares ELSE 0 END) > 0
+                ) ticker_values
+                WHERE price IS NOT NULL
             ), 0
         ) AS ending_portfolio_value,
         
@@ -97,7 +114,6 @@ monthly_performance AS (
         ) AS net_cash_flow
         
     FROM date_mappings dm
-    WHERE dm.beg_price_date IS NOT NULL AND dm.end_price_date IS NOT NULL
 )
 SELECT 
     month_year,
