@@ -28,50 +28,60 @@ WITH monthly_periods AS (
         ) as month_start
     ) months
 ),
-monthly_performance AS (
+-- Find the closest available price dates for each month
+date_mappings AS (
     SELECT 
         mp.month_year,
         mp.month_start_date,
         mp.month_end_date,
-        -- Beginning portfolio value (last day of previous month or start of period)
+        (SELECT MAX(ps.date) 
+         FROM prices_stocks ps 
+         WHERE ps.date <= (mp.month_start_date - INTERVAL '1 day')
+           AND ps.ticker IN (SELECT DISTINCT ticker FROM transactions_temp WHERE acct_num = " . $q . ")
+        ) AS beg_price_date,
+        (SELECT MAX(ps.date) 
+         FROM prices_stocks ps 
+         WHERE ps.date <= mp.month_end_date
+           AND ps.ticker IN (SELECT DISTINCT ticker FROM transactions_temp WHERE acct_num = " . $q . ")
+        ) AS end_price_date
+    FROM monthly_periods mp
+),
+monthly_performance AS (
+    SELECT 
+        dm.month_year,
+        dm.month_start_date,
+        dm.month_end_date,
+        dm.beg_price_date,
+        dm.end_price_date,
+        -- Beginning portfolio value using closest available price date
         COALESCE(
             (
                 SELECT SUM(
-                    (SELECT SUM(CASE WHEN tr.transaction_date <= (mp.month_start_date - INTERVAL '1 day') THEN tr.shares ELSE 0 END) 
+                    (SELECT SUM(CASE WHEN tr.transaction_date <= (dm.month_start_date - INTERVAL '1 day') THEN tr.shares ELSE 0 END) 
                      FROM transactions_temp tr 
                      WHERE tr.ticker = p.ticker AND tr.acct_num = " . $q . ") * p.close
                 )
                 FROM prices_stocks p
-                WHERE p.date = (
-                    SELECT MAX(ps.date) 
-                    FROM prices_stocks ps 
-                    WHERE ps.date <= (mp.month_start_date - INTERVAL '1 day')
-                      AND ps.ticker IN (SELECT DISTINCT ticker FROM transactions_temp WHERE acct_num = " . $q . ")
-                )
+                WHERE p.date = dm.beg_price_date
                 AND p.ticker IN (SELECT DISTINCT ticker FROM transactions_temp WHERE acct_num = " . $q . ")
-                AND (SELECT SUM(CASE WHEN tr.transaction_date <= (mp.month_start_date - INTERVAL '1 day') THEN tr.shares ELSE 0 END) 
+                AND (SELECT SUM(CASE WHEN tr.transaction_date <= (dm.month_start_date - INTERVAL '1 day') THEN tr.shares ELSE 0 END) 
                      FROM transactions_temp tr 
                      WHERE tr.ticker = p.ticker AND tr.acct_num = " . $q . ") > 0
             ), 0
         ) AS beginning_portfolio_value,
         
-        -- Ending portfolio value (last day of month)
+        -- Ending portfolio value using closest available price date
         COALESCE(
             (
                 SELECT SUM(
-                    (SELECT SUM(CASE WHEN tr.transaction_date <= mp.month_end_date THEN tr.shares ELSE 0 END) 
+                    (SELECT SUM(CASE WHEN tr.transaction_date <= dm.month_end_date THEN tr.shares ELSE 0 END) 
                      FROM transactions_temp tr 
                      WHERE tr.ticker = p.ticker AND tr.acct_num = " . $q . ") * p.close
                 )
                 FROM prices_stocks p
-                WHERE p.date = (
-                    SELECT MAX(ps.date) 
-                    FROM prices_stocks ps 
-                    WHERE ps.date <= mp.month_end_date
-                      AND ps.ticker IN (SELECT DISTINCT ticker FROM transactions_temp WHERE acct_num = " . $q . ")
-                )
+                WHERE p.date = dm.end_price_date
                 AND p.ticker IN (SELECT DISTINCT ticker FROM transactions_temp WHERE acct_num = " . $q . ")
-                AND (SELECT SUM(CASE WHEN tr.transaction_date <= mp.month_end_date THEN tr.shares ELSE 0 END) 
+                AND (SELECT SUM(CASE WHEN tr.transaction_date <= dm.month_end_date THEN tr.shares ELSE 0 END) 
                      FROM transactions_temp tr 
                      WHERE tr.ticker = p.ticker AND tr.acct_num = " . $q . ") > 0
             ), 0
@@ -82,11 +92,12 @@ monthly_performance AS (
             (SELECT SUM(amount) 
              FROM transactions_temp tr 
              WHERE tr.acct_num = " . $q . "
-               AND tr.transaction_date >= mp.month_start_date 
-               AND tr.transaction_date <= mp.month_end_date), 0
+               AND tr.transaction_date >= dm.month_start_date 
+               AND tr.transaction_date <= dm.month_end_date), 0
         ) AS net_cash_flow
         
-    FROM monthly_periods mp
+    FROM date_mappings dm
+    WHERE dm.beg_price_date IS NOT NULL AND dm.end_price_date IS NOT NULL
 )
 SELECT 
     month_year,
