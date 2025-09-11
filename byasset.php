@@ -83,45 +83,58 @@ ORDER BY
 ";
 
 
-$sql = "WITH cte AS (
-SELECT
-    t.ticker,
-    SUM(CASE WHEN t.transaction_date < '".$beg."' THEN t.shares ELSE 0 END) AS beg_shares,
-    SUM(CASE WHEN t.transaction_date BETWEEN '".$beg."' AND '".$end."' THEN t.shares ELSE 0 END) AS shares_bought_sold,
-    SUM(CASE WHEN t.transaction_date BETWEEN '".$beg."' AND '".$end."' THEN t.amount ELSE 0 END) AS cf,
-    SUM(CASE WHEN t.transaction_date < '".$end."' THEN t.shares ELSE 0 END) AS end_shares,
-    SUM(CASE WHEN t.transaction_date < '".$beg."' THEN t.shares ELSE 0 END) * beg_prices.close AS beg_value,
-    SUM(CASE WHEN t.transaction_date < '".$end."' THEN t.shares ELSE 0 END) * end_prices.close AS end_value,
-    beg_prices.close AS beg_price,
-    end_prices.close AS end_price
-FROM
-    transactions_temp AS t
-JOIN
-    prices_stocks AS beg_prices ON t.ticker = beg_prices.ticker AND beg_prices.date = '".$beg."'
-JOIN
-    prices_stocks AS end_prices ON t.ticker = end_prices.ticker AND end_prices.date = '".$end."'
-WHERE
-    t.acct_num = 592
-GROUP BY
-    t.ticker, beg_prices.close, end_prices.close
+$sql = "WITH holdings AS (
+    -- First, calculate share balances and cash flows for each ticker.
+    SELECT
+        t.ticker,
+        SUM(CASE WHEN t.transaction_date < '".$beg."' THEN t.shares ELSE 0 END) AS beg_shares,
+        SUM(CASE WHEN t.transaction_date BETWEEN '".$beg."' AND '".$end."' THEN t.shares ELSE 0 END) AS shares_bought_sold,
+        SUM(CASE WHEN t.transaction_date BETWEEN '".$beg."' AND '".$end."' THEN t.amount ELSE 0 END) AS cf,
+        -- Note: I corrected this to '<=' to properly include the end date in the final share count.
+        SUM(CASE WHEN t.transaction_date <= '".$end."' THEN t.shares ELSE 0 END) AS end_shares
+    FROM
+        transactions_temp AS t
+    WHERE
+        t.acct_num = 592
+    GROUP BY
+        t.ticker
 ),
-gain_loss AS (
-SELECT
-  ticker,
-  beg_shares,
-  shares_bought_sold,
-  end_shares,
-  beg_value,
-  cf,
-  end_value,
-  (end_value - (beg_value - cf)) AS gain_loss,
-  beg_price,
-  end_price
-FROM cte
+final_data AS (
+    -- Now, for each ticker with holdings, find its correct price.
+    SELECT
+        h.ticker,
+        h.beg_shares,
+        h.shares_bought_sold,
+        h.end_shares,
+        h.cf,
+        -- *** THE FIX IS HERE ***
+        -- For each ticker, find its most recent price BEFORE the period starts.
+        (SELECT close FROM prices_stocks p WHERE p.ticker = h.ticker AND p.date < '".$beg."' ORDER BY p.date DESC LIMIT 1) AS beg_price,
+        -- For each ticker, find its most recent price ON or BEFORE the period ends.
+        (SELECT close FROM prices_stocks p WHERE p.ticker = h.ticker AND p.date <= '".$end."' ORDER BY p.date DESC LIMIT 1) AS end_price
+    FROM
+        holdings h
 )
-SELECT * FROM gain_loss
-WHERE gain_loss <> 0
-ORDER BY (end_value - (beg_value - cf)) DESC";
+-- Final calculation and presentation.
+SELECT
+    ticker,
+    beg_shares,
+    shares_bought_sold,
+    end_shares,
+    cf,
+    (beg_shares * beg_price) AS beg_value,
+    (end_shares * end_price) AS end_value,
+    ((end_shares * end_price) - (beg_shares * beg_price) + cf) AS gain_loss,
+    beg_price,
+    end_price
+FROM
+    final_data
+WHERE
+    -- Filter out tickers that had no change in value or holdings.
+    COALESCE(((end_shares * end_price) - (beg_shares * beg_price) + cf), 0) <> 0
+ORDER BY
+    gain_loss DESC;
+";
 
 $result = pg_query($con, $sql);
 if (!$result) {
