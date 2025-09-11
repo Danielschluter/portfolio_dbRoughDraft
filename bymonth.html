@@ -301,11 +301,19 @@
                         rowsHTML += `<td class="month-cell" onclick="showMonthDetail('${row[col]}')">${row[col]}</td>`;
                     } else if (col === 'total_gain_loss_pct') {
                         const value = (row[col] * 1).toFixed(2);
-                        const className = value >= 0 ? 'positive' : 'negative';
-                        rowsHTML += `<td class="${className}">${value}%</td>`;
+                        if (value == 0) {
+                            rowsHTML += `<td></td>`;
+                        } else {
+                            const className = value >= 0 ? 'positive' : 'negative';
+                            rowsHTML += `<td class="${className}">${value}%</td>`;
+                        }
                     } else if (typeof row[col] === 'number' && col !== 'month_year') {
-                        // Format as currency for numeric values
-                        rowsHTML += `<td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row[col])}</td>`;
+                        // Format as currency for numeric values, show blank for zero
+                        if (row[col] == 0) {
+                            rowsHTML += `<td></td>`;
+                        } else {
+                            rowsHTML += `<td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row[col])}</td>`;
+                        }
                     } else {
                         rowsHTML += `<td>${row[col]}</td>`;
                     }
