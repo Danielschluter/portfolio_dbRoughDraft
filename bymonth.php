@@ -34,7 +34,8 @@ date_mappings AS (
         mp.month_year,
         mp.month_start_date,
         mp.month_end_date,
-        -- For beginning date, use the last day of the previous month
+        -- For beginning date, find the most recent price date before the month starts
+        -- Use a more flexible approach that doesn't require all tickers to have the same date
         (SELECT MAX(date) 
          FROM prices_stocks ps 
          WHERE ps.date <= (mp.month_start_date - INTERVAL '1 day')
@@ -62,7 +63,7 @@ monthly_performance AS (
                 FROM (
                     SELECT 
                         t.ticker,
-                        SUM(CASE WHEN t.transaction_date <= dm.beg_price_date THEN t.shares ELSE 0 END) as shares_held,
+                        SUM(CASE WHEN t.transaction_date <= (dm.month_start_date - INTERVAL '1 day') THEN t.shares ELSE 0 END) as shares_held,
                         (SELECT p.close 
                          FROM prices_stocks p 
                          WHERE p.ticker = t.ticker 
@@ -72,7 +73,7 @@ monthly_performance AS (
                     FROM transactions_temp t
                     WHERE t.acct_num = " . $q . "
                     GROUP BY t.ticker
-                    HAVING SUM(CASE WHEN t.transaction_date <= dm.beg_price_date THEN t.shares ELSE 0 END) > 0
+                    HAVING SUM(CASE WHEN t.transaction_date <= (dm.month_start_date - INTERVAL '1 day') THEN t.shares ELSE 0 END) > 0
                 ) ticker_values
                 WHERE price IS NOT NULL
             ), 0
