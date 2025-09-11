@@ -361,15 +361,15 @@
                     
                     tableHTML += '<tr>';
                     tableHTML += `<td><strong>${row.ticker}</strong></td>`;
-                    tableHTML += `<td>${row.beg_shares || 0}</td>`;
-                    tableHTML += `<td>${row.shares_bought_sold || 0}</td>`;
-                    tableHTML += `<td>${row.end_shares || 0}</td>`;
-                    tableHTML += `<td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.beg_value || 0)}</td>`;
-                    tableHTML += `<td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.cf || 0)}</td>`;
-                    tableHTML += `<td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.end_value || 0)}</td>`;
-                    tableHTML += `<td class="${gainLossClass}">${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(gainLoss)}</td>`;
-                    tableHTML += `<td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.beg_price || 0)}</td>`;
-                    tableHTML += `<td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.end_price || 0)}</td>`;
+                    tableHTML += `<td>${(row.beg_shares && row.beg_shares != 0) ? row.beg_shares : ''}</td>`;
+                    tableHTML += `<td>${(row.shares_bought_sold && row.shares_bought_sold != 0) ? row.shares_bought_sold : ''}</td>`;
+                    tableHTML += `<td>${(row.end_shares && row.end_shares != 0) ? row.end_shares : ''}</td>`;
+                    tableHTML += `<td>${(row.beg_value && row.beg_value != 0) ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.beg_value) : ''}</td>`;
+                    tableHTML += `<td>${(row.cf && row.cf != 0) ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.cf) : ''}</td>`;
+                    tableHTML += `<td>${(row.end_value && row.end_value != 0) ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.end_value) : ''}</td>`;
+                    tableHTML += `<td class="${gainLossClass}">${gainLoss != 0 ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(gainLoss) : ''}</td>`;
+                    tableHTML += `<td>${(row.beg_price && row.beg_price != 0) ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.beg_price) : ''}</td>`;
+                    tableHTML += `<td>${(row.end_price && row.end_price != 0) ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.end_price) : ''}</td>`;
                     tableHTML += '</tr>';
                 }
 
