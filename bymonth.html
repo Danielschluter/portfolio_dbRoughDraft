@@ -353,6 +353,7 @@
                 tableHTML += '<th>Gain/Loss</th>';
                 tableHTML += '<th>Begin Price</th>';
                 tableHTML += '<th>End Price</th>';
+                tableHTML += '<th>Price Return</th>';
                 tableHTML += '</tr></thead><tbody>';
 
                 for (let row of data) {
@@ -370,6 +371,7 @@
                     tableHTML += `<td class="${gainLossClass}">${gainLoss != 0 ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(gainLoss) : ''}</td>`;
                     tableHTML += `<td>${(row.beg_price && row.beg_price != 0) ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.beg_price) : ''}</td>`;
                     tableHTML += `<td>${(row.end_price && row.end_price != 0) ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.end_price) : ''}</td>`;
+                    tableHTML += `<td>${(row.price_change_pct && row.price_change_pct != 0) ? new Intl.NumberFormat('en-US', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2, }).format(row.price_change_pct) : ''}</td>`;
                     tableHTML += '</tr>';
                 }
 

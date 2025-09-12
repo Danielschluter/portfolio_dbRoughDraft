@@ -126,7 +126,9 @@ SELECT
     (end_shares * end_price) AS end_value,
     ((end_shares * end_price) - (beg_shares * beg_price) + cf) AS gain_loss,
     beg_price,
-    end_price
+    end_price,
+    ((end_shares * end_price) - (beg_shares * beg_price) + cf) / (beg_shares * beg_price) * 100 AS gain_loss_pct,
+    ((end_price - beg_price) / beg_price) AS price_change_pct
 FROM
     final_data
 WHERE

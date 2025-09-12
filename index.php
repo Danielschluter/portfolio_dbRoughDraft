@@ -44,7 +44,7 @@
 
     $acct_num = 592;
 
-    $sql = "WITH tr AS ( 
+/*    $sql = "WITH tr AS ( 
         SELECT * FROM transactions_temp WHERE acct_num = ".$acct_num."
     ),
     pr AS (
@@ -61,16 +61,39 @@
             close,
             SUM(tr.shares) OVER (PARTITION BY pr.ticker ORDER BY pr.date) AS totalshares,
             pr.close * SUM(tr.shares) OVER (PARTITION BY pr.ticker ORDER BY pr.date) AS marketvalue,
-            SUM(amount) OVER (PARTITION BY pr.date, pr.ticker ORDER BY pr.date) AS cf
+            SUM(CASE WHEN transaction_type LIKE '%Div%' THEN amount ELSE 0 END) OVER (PARTITION BY pr.date, pr.ticker ORDER BY pr.date) AS cf
         FROM pr
         LEFT JOIN tr
         ON pr.date = tr.transaction_date
         AND pr.ticker = tr.ticker
         ORDER BY ticker, date
     )
-    SELECT * FROM mktvalues
+    SELECT *,
+        (cf / totalshares) AS dps,
+        (close +(cf / totalshares)) / LAG(close) OVER (PARTITION BY ticker ORDER BY date) AS pctchange
+    FROM mktvalues
     WHERE marketvalue IS NOT NULL
+    AND ticker IN ('BMY', 'JPM', 'RSP')
     ORDER BY ticker, date";
+      */
+
+     // Get latest balance of each acct_num
+      $sql = "SELECT
+      acct_num,
+      transactions_temp.ticker,
+      SUM(shares) AS quantity,
+      close,
+      ROUND(SUM(shares) * close, 2)::money AS market_value
+      FROM transactions_temp
+      LEFT JOIN prices_stocks
+      ON transactions_temp.ticker = prices_stocks.ticker
+      AND prices_stocks.date = (SELECT MAX(date) FROM prices_stocks)
+      WHERE acct_num = ".$acct_num."
+      AND prices_stocks.ticker IN (SELECT DISTINCT ticker FROM transactions_temp WHERE acct_num = ".$acct_num.")
+      GROUP BY acct_num, transactions_temp.ticker, close
+      HAVING SUM(shares) <> 0
+      ORDER BY market_value DESC";
+      
 
     $result = pg_query($con, $sql);
     if (!$result) {
